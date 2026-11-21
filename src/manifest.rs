@@ -8,7 +8,7 @@ use std::collections::HashMap;
 /// Адреса демона. Можна перевизначити під час збирання: ALTHERRA_API=https://… cargo build
 pub const API_URL: &str = match option_env!("ALTHERRA_API") {
     Some(u) => u,
-    None => "https://launcher.altherra.com.ua",
+    None => "https://launcher.altherra.com.ua:8443",
 };
 
 pub fn api_url() -> String {
