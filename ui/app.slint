@@ -1,0 +1,922 @@
+import { Theme, Card, Button, Field, Toggle, Slider, Segmented, Avatar } from "theme.slint";
+import { ScrollView, ListView } from "std-widgets.slint";
+
+export struct NewsItem {
+    title: string,
+    date: string,
+    summary: string,
+    url: string,
+    cover: image,
+    has-cover: bool,
+}
+
+export struct AccountItem {
+    id: string,
+    name: string,
+    initial: string,
+    licensed: bool,
+    face: image,
+    has-face: bool,
+    selected: bool,
+}
+
+export struct FileItem {
+    name: string,
+    dir: string,
+    size: string,
+}
+
+// Кнопка бічного меню з іконкою.
+component NavButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <bool> active;
+    callback clicked;
+    width: 80px;
+    height: 60px;
+    border-radius: 14px;
+    background: root.active ? #3cf2ff1f : (ta.has-hover ? #ffffff0a : transparent);
+    animate background { duration: 120ms; }
+    Rectangle {
+        x: 0;
+        y: 16px;
+        width: 3px;
+        height: parent.height - 32px;
+        border-radius: 2px;
+        background: Theme.cyan;
+        visible: root.active;
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: 4px;
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                width: 20px;
+                height: 20px;
+                colorize: root.active ? Theme.cyan : (ta.has-hover ? Theme.text : Theme.muted);
+            }
+        }
+        Text {
+            text: root.label;
+            font-size: 10px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            color: root.active ? Theme.text : Theme.muted;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component Chip inherits Rectangle {
+    in property <string> text;
+    in property <color> fg: Theme.muted;
+    height: 30px;
+    width: t.preferred-width + 24px;
+    border-radius: 15px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.line;
+    t := Text {
+        text: root.text;
+        color: root.fg;
+        font-family: Theme.mono;
+        font-size: 12px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component SectionTitle inherits Text {
+    font-family: Theme.display;
+    font-weight: 800;
+    font-size: 20px;
+    color: Theme.text;
+}
+
+component NewsCard inherits Rectangle {
+    in property <NewsItem> item;
+    callback open(string);
+    border-radius: 16px;
+    background: ta.has-hover ? #16203580 : Theme.surface;
+    border-width: 1px;
+    border-color: ta.has-hover ? Theme.line-strong : Theme.line;
+    clip: true;
+    animate background, border-color { duration: 150ms; }
+    VerticalLayout {
+        Rectangle {
+            height: root.width * 0.45;
+            background: @linear-gradient(140deg, #3cf2ff26 0%, #9b6bff33 100%);
+            if root.item.has-cover: Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.item.cover;
+                image-fit: cover;
+            }
+            if !root.item.has-cover: Image {
+                source: @image-url("../assets/logo.svg");
+                width: 44px;
+                height: 44px;
+                opacity: 0.6;
+            }
+        }
+        VerticalLayout {
+            padding: 14px;
+            spacing: 6px;
+            Text {
+                text: root.item.date;
+                font-family: Theme.mono;
+                font-size: 11px;
+                color: Theme.violet;
+            }
+            Text {
+                text: root.item.title;
+                font-weight: 700;
+                font-size: 15px;
+                color: Theme.text;
+                wrap: word-wrap;
+                overflow: elide;
+                max-height: 44px;
+            }
+            Text {
+                text: root.item.summary;
+                font-size: 12px;
+                color: Theme.muted;
+                wrap: word-wrap;
+                overflow: elide;
+                max-height: 34px;
+            }
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.open(root.item.url); }
+    }
+}
+
+component SettingRow inherits Rectangle {
+    in property <string> title;
+    in property <string> hint;
+    min-height: 64px;
+    HorizontalLayout {
+        spacing: 24px;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 3px;
+            Text {
+                text: root.title;
+                font-weight: 700;
+                font-size: 14px;
+                color: Theme.text;
+            }
+            Text {
+                text: root.hint;
+                font-size: 12px;
+                color: Theme.muted;
+                wrap: word-wrap;
+                visible: root.hint != "";
+            }
+        }
+        @children
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "Altherra";
+    icon: @image-url("../assets/icon.png");
+    preferred-width: 1120px;
+    preferred-height: 700px;
+    min-width: 900px;
+    min-height: 600px;
+    background: Theme.bg;
+    default-font-family: Theme.body;
+    default-font-size: 14px;
+
+    // Сторінка: 0 головна, 1 збірка, 2 налаштування, 3 журнал
+    in-out property <int> page: 0;
+
+    // Сервер і збірка
+    in property <string> server-name: "Altherra";
+    in property <string> tagline: "Адміністрація створює світ. Гравці створюють усе інше.";
+    in property <int> server-state: 0; // 0 перевіряємо, 1 онлайн, 2 вимкнений
+    in property <string> server-status: "перевіряємо сервер…";
+    in property <string> mc-version: "";
+    in property <string> loader-text: "";
+    in property <string> build-info: "";
+    in property <int> mods-count: 0;
+    in property <bool> manifest-offline: false;
+    in property <string> manifest-error: "";
+    in property <[NewsItem]> news: [];
+    in property <[FileItem]> files: [];
+
+    // Акаунти
+    in property <[AccountItem]> accounts: [];
+    in property <bool> has-account: false;
+    in property <AccountItem> account;
+    in-out property <bool> accounts-open: false;
+    in property <bool> ms-available: false;
+    in property <string> ms-code: "";
+    in property <string> ms-url: "";
+    in property <bool> ms-waiting: false;
+    in property <string> acc-error: "";
+    in-out property <string> offline-nick: "";
+
+    // Запуск
+    in property <bool> busy: false;
+    in property <float> progress: 0;
+    in property <string> status-text: "";
+    in property <bool> game-running: false;
+    in property <string> toast: "";
+    in property <string> update-version: "";
+    in property <bool> update-busy: false;
+
+    // Налаштування
+    in-out property <float> ram-gb: 4;
+    in property <float> ram-max: 16;
+    in property <float> ram-recommended: 4;
+    in-out property <string> java-path: "";
+    in-out property <string> jvm-args: "";
+    in-out property <int> after-launch: 1;
+    in-out property <bool> auto-connect: true;
+    in property <string> game-dir: "";
+    in property <string> version: "";
+
+    // Журнал
+    in property <[string]> log-lines: [];
+
+    callback play();
+    callback open-url(string);
+    callback select-account(string);
+    callback remove-account(string);
+    callback add-offline(string);
+    callback ms-login();
+    callback ms-cancel();
+    callback save-settings();
+    callback open-game-dir();
+    callback open-logs-dir();
+    callback verify-files();
+    callback refresh();
+    callback kill-game();
+    callback do-update();
+
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: @image-url("../assets/bg.svg");
+        image-fit: cover;
+    }
+
+    HorizontalLayout {
+        // ---------- Бічне меню ----------
+        Rectangle {
+            width: 96px;
+            background: #05070dcc;
+            border-width: 0;
+            Rectangle {
+                x: parent.width - 1px;
+                width: 1px;
+                background: Theme.line;
+            }
+            VerticalLayout {
+                padding-top: 20px;
+                padding-bottom: 16px;
+                alignment: start;
+                spacing: 6px;
+                HorizontalLayout {
+                    alignment: center;
+                    padding-bottom: 22px;
+                    Image {
+                        source: @image-url("../assets/logo.svg");
+                        width: 38px;
+                        height: 38px;
+                    }
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    NavButton { icon: @image-url("../assets/icon-home.svg"); label: "Головна"; active: root.page == 0; clicked => { root.page = 0; } }
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    NavButton { icon: @image-url("../assets/icon-box.svg"); label: "Збірка"; active: root.page == 1; clicked => { root.page = 1; } }
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    NavButton { icon: @image-url("../assets/icon-gear.svg"); label: "Налаштування"; active: root.page == 2; clicked => { root.page = 2; } }
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    NavButton { icon: @image-url("../assets/icon-term.svg"); label: "Журнал"; active: root.page == 3; clicked => { root.page = 3; } }
+                }
+            }
+        }
+
+        // ---------- Вміст ----------
+        VerticalLayout {
+            horizontal-stretch: 1;
+
+            Rectangle {
+                vertical-stretch: 1;
+
+                // Головна
+                if root.page == 0: VerticalLayout {
+                    padding: 40px;
+                    padding-bottom: 16px;
+                    spacing: 0;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+                        Rectangle {
+                            height: 30px;
+                            width: st.preferred-width + 40px;
+                            border-radius: 15px;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: root.server-state == 1 ? #4dffa655 : Theme.line;
+                            dot := Rectangle {
+                                x: 13px;
+                                width: 9px;
+                                height: 9px;
+                                border-radius: 5px;
+                                background: root.server-state == 1 ? Theme.green : (root.server-state == 2 ? Theme.red : Theme.muted);
+                                drop-shadow-blur: root.server-state == 1 ? 8px : 0;
+                                drop-shadow-color: Theme.green;
+                            }
+                            st := Text {
+                                x: 30px;
+                                text: root.server-status;
+                                color: root.server-state == 1 ? Theme.green : Theme.muted;
+                                font-family: Theme.mono;
+                                font-size: 12px;
+                                vertical-alignment: center;
+                                height: parent.height;
+                            }
+                        }
+                        if root.mc-version != "": Chip { text: "Minecraft " + root.mc-version; }
+                        if root.loader-text != "": Chip { text: root.loader-text; }
+                        if root.mods-count > 0: Chip { text: root.mods-count + " модів"; }
+                        Rectangle { horizontal-stretch: 1; }
+                        if root.update-version != "": Rectangle {
+                            height: 30px;
+                            width: up-t.preferred-width + 28px;
+                            border-radius: 15px;
+                            background: up-ta.has-hover && !root.update-busy ? @linear-gradient(100deg, #3cf2ff 0%, #9b6bff 100%) : #3cf2ff1f;
+                            border-width: 1px;
+                            border-color: #3cf2ff66;
+                            up-t := Text {
+                                text: root.update-busy ? "Оновлюємо…" : "Нова версія " + root.update-version + " · Оновити";
+                                color: up-ta.has-hover && !root.update-busy ? #04060b : Theme.cyan;
+                                font-weight: 700;
+                                font-size: 12px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            up-ta := TouchArea {
+                                enabled: !root.update-busy && !root.busy && !root.game-running;
+                                mouse-cursor: self.enabled ? pointer : default;
+                                clicked => { root.do-update(); }
+                            }
+                        }
+                    }
+
+                    Rectangle { height: 26px; }
+                    Text {
+                        text: "ALTHERRA";
+                        font-family: Theme.display;
+                        font-weight: 800;
+                        font-size: 76px;
+                        letter-spacing: 6px;
+                        color: @linear-gradient(100deg, #ffffff 10%, #3cf2ff 45%, #9b6bff 75%, #ff4fd8 100%);
+                    }
+                    Text {
+                        text: root.tagline;
+                        font-size: 17px;
+                        color: Theme.muted;
+                        wrap: word-wrap;
+                    }
+
+                    if root.manifest-offline || root.manifest-error != "": Rectangle {
+                        height: 44px;
+                        border-radius: 12px;
+                        background: #ffc24d12;
+                        border-width: 1px;
+                        border-color: #ffc24d59;
+                        Text {
+                            x: 16px;
+                            width: parent.width - 32px;
+                            height: parent.height;
+                            vertical-alignment: center;
+                            text: root.manifest-error != "" ? root.manifest-error : "Немає звʼязку із сервером лаунчера — граємо з останньою збіркою.";
+                            color: Theme.amber;
+                            font-size: 13px;
+                            overflow: elide;
+                        }
+                    }
+
+                    Rectangle { vertical-stretch: 1; min-height: 20px; }
+
+                    if root.news.length > 0: VerticalLayout {
+                        spacing: 14px;
+                        HorizontalLayout {
+                            SectionTitle { text: "Новини"; }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+                        HorizontalLayout {
+                            spacing: 14px;
+                            for n in root.news: NewsCard {
+                                item: n;
+                                horizontal-stretch: 1;
+                                max-width: 320px;
+                                open(u) => { root.open-url(u); }
+                            }
+                            if root.news.length < 3: Rectangle { horizontal-stretch: 3 - root.news.length; }
+                        }
+                    }
+                }
+
+                // Збірка
+                if root.page == 1: VerticalLayout {
+                    padding: 40px;
+                    spacing: 18px;
+                    HorizontalLayout {
+                        VerticalLayout {
+                            spacing: 4px;
+                            SectionTitle { text: "Збірка"; font-size: 26px; }
+                            Text { text: root.build-info; color: Theme.muted; font-family: Theme.mono; font-size: 12px; }
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Button { text: "Оновити"; width: 120px; clicked => { root.refresh(); } }
+                    }
+                    Card {
+                        vertical-stretch: 1;
+                        if root.files.length == 0: Text {
+                            text: "У збірці немає модів — гра запуститься як є.";
+                            color: Theme.muted;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        ListView {
+                            x: 8px;
+                            y: 8px;
+                            width: parent.width - 16px;
+                            height: parent.height - 16px;
+                            for f in root.files: Rectangle {
+                                height: 52px;
+                                HorizontalLayout {
+                                    padding-left: 14px;
+                                    padding-right: 14px;
+                                    spacing: 12px;
+                                    Rectangle {
+                                        width: 34px;
+                                        height: 34px;
+                                        y: 9px;
+                                        border-radius: 9px;
+                                        background: #3cf2ff14;
+                                        Text {
+                                            text: f.dir == "mods" ? "M" : f.dir == "resourcepacks" ? "R" : f.dir == "shaderpacks" ? "S" : "C";
+                                            color: Theme.cyan;
+                                            font-family: Theme.display;
+                                            font-weight: 800;
+                                        }
+                                    }
+                                    Text {
+                                        text: f.name;
+                                        color: Theme.text;
+                                        font-weight: 700;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                        overflow: elide;
+                                    }
+                                    Text { text: f.dir; color: Theme.muted; font-family: Theme.mono; font-size: 11px; vertical-alignment: center; }
+                                    Text { text: f.size; color: Theme.muted; font-family: Theme.mono; font-size: 11px; vertical-alignment: center; width: 70px; horizontal-alignment: right; }
+                                }
+                                Rectangle {
+                                    y: parent.height - 1px;
+                                    height: 1px;
+                                    background: Theme.line;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Налаштування
+                if root.page == 2: ScrollView {
+                    VerticalLayout {
+                        padding: 40px;
+                        spacing: 18px;
+                        alignment: start;
+                        SectionTitle { text: "Налаштування"; font-size: 26px; }
+                        Card {
+                            VerticalLayout {
+                                padding: 24px;
+                                padding-top: 12px;
+                                padding-bottom: 12px;
+                                SettingRow {
+                                    title: "Памʼять для гри";
+                                    hint: "Сервер радить " + round(root.ram-recommended) + " ГБ. Більше половини памʼяті компʼютера ставити не варто.";
+                                    HorizontalLayout {
+                                        width: 300px;
+                                        spacing: 14px;
+                                        alignment: end;
+                                        Slider {
+                                            y: 18px;
+                                            width: 200px;
+                                            minimum: 1;
+                                            maximum: root.ram-max;
+                                            step: 1;
+                                            value <=> root.ram-gb;
+                                            changed => { root.save-settings(); }
+                                        }
+                                        Rectangle {
+                                            y: 16px;
+                                            width: 70px;
+                                            height: 32px;
+                                            border-radius: 16px;
+                                            background: #3cf2ff1a;
+                                            Text { text: round(root.ram-gb) + " ГБ"; color: Theme.cyan; font-family: Theme.mono; font-size: 13px; }
+                                        }
+                                    }
+                                }
+                                Rectangle { height: 1px; background: Theme.line; }
+                                SettingRow {
+                                    title: "Одразу заходити на сервер";
+                                    hint: "Гра після запуску сама підключиться до Altherra.";
+                                    Toggle { y: 20px; checked <=> root.auto-connect; toggled => { root.save-settings(); } }
+                                }
+                                Rectangle { height: 1px; background: Theme.line; }
+                                SettingRow {
+                                    title: "Після запуску гри";
+                                    hint: "";
+                                    Segmented {
+                                        y: 12px;
+                                        width: 330px;
+                                        options: ["Лишити", "Згорнути", "Закрити"];
+                                        current <=> root.after-launch;
+                                        changed => { root.save-settings(); }
+                                    }
+                                }
+                                Rectangle { height: 1px; background: Theme.line; }
+                                SettingRow {
+                                    title: "Java";
+                                    hint: "Порожньо — лаунчер сам поставить потрібну Java від Mojang.";
+                                    Field {
+                                        y: 11px;
+                                        width: 330px;
+                                        mono: true;
+                                        placeholder: "Авто";
+                                        text <=> root.java-path;
+                                        edited => { root.save-settings(); }
+                                    }
+                                }
+                                Rectangle { height: 1px; background: Theme.line; }
+                                SettingRow {
+                                    title: "Аргументи JVM";
+                                    hint: "Для тих, хто знає, навіщо це.";
+                                    Field {
+                                        y: 11px;
+                                        width: 330px;
+                                        mono: true;
+                                        placeholder: "-XX:+UseZGC";
+                                        text <=> root.jvm-args;
+                                        edited => { root.save-settings(); }
+                                    }
+                                }
+                            }
+                        }
+                        Card {
+                            VerticalLayout {
+                                padding: 24px;
+                                spacing: 14px;
+                                Text { text: "Файли гри"; font-weight: 700; color: Theme.text; }
+                                Text { text: root.game-dir; font-family: Theme.mono; font-size: 12px; color: Theme.muted; overflow: elide; }
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    alignment: start;
+                                    Button { text: "Відкрити теку гри"; clicked => { root.open-game-dir(); } }
+                                    Button { text: "Перевірити файли"; enabled: !root.busy && !root.game-running; clicked => { root.verify-files(); } }
+                                }
+                            }
+                        }
+                        Text { text: "Altherra Launcher " + root.version + " · Made with Slint"; font-family: Theme.mono; font-size: 11px; color: #8a97ad88; }
+                    }
+                }
+
+                // Журнал
+                if root.page == 3: VerticalLayout {
+                    padding: 40px;
+                    spacing: 18px;
+                    HorizontalLayout {
+                        SectionTitle { text: "Журнал гри"; font-size: 26px; }
+                        Rectangle { horizontal-stretch: 1; }
+                        Button { text: "Теку журналів"; clicked => { root.open-logs-dir(); } }
+                    }
+                    Card {
+                        vertical-stretch: 1;
+                        background: #03050ae6;
+                        if root.log-lines.length == 0: Text {
+                            text: "Тут зʼявиться вивід гри після запуску.";
+                            color: Theme.muted;
+                        }
+                        log := ListView {
+                            x: 10px;
+                            y: 10px;
+                            width: parent.width - 20px;
+                            height: parent.height - 20px;
+                            for line in root.log-lines: Text {
+                                text: line;
+                                font-family: Theme.mono;
+                                font-size: 11px;
+                                color: Theme.muted;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ---------- Нижня панель ----------
+            Rectangle {
+                height: 96px;
+                background: #05070de6;
+                Rectangle {
+                    height: 1px;
+                    y: 0;
+                    background: Theme.line;
+                }
+                HorizontalLayout {
+                    padding-left: 28px;
+                    padding-right: 28px;
+                    spacing: 20px;
+
+                    // Акаунт
+                    acc := Rectangle {
+                        y: 18px;
+                        height: 60px;
+                        width: 250px;
+                        border-radius: 14px;
+                        background: acc-ta.has-hover ? #ffffff0d : Theme.surface;
+                        border-width: 1px;
+                        border-color: acc-ta.has-hover ? Theme.line-strong : Theme.line;
+                        HorizontalLayout {
+                            padding: 10px;
+                            spacing: 12px;
+                            Avatar {
+                                size: 40px;
+                                face: root.account.face;
+                                has-face: root.has-account && root.account.has-face;
+                                initial: root.has-account ? root.account.initial : "+";
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: root.has-account ? root.account.name : "Додай акаунт";
+                                    font-weight: 700;
+                                    font-size: 15px;
+                                    color: Theme.text;
+                                    overflow: elide;
+                                }
+                                Text {
+                                    text: !root.has-account ? "ліцензія або нік" : root.account.licensed ? "ліцензія" : "без ліцензії";
+                                    font-family: Theme.mono;
+                                    font-size: 11px;
+                                    color: root.has-account && root.account.licensed ? Theme.green : Theme.muted;
+                                }
+                            }
+                            Text { text: "⌃"; color: Theme.muted; vertical-alignment: center; font-size: 16px; }
+                        }
+                        acc-ta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.accounts-open = true; }
+                        }
+                    }
+
+                    // Прогрес
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        spacing: 8px;
+                        Text {
+                            text: root.status-text;
+                            color: Theme.muted;
+                            font-size: 13px;
+                            overflow: elide;
+                        }
+                        if root.busy: Rectangle {
+                            height: 6px;
+                            border-radius: 3px;
+                            background: #ffffff14;
+                            Rectangle {
+                                x: 0;
+                                width: parent.width * clamp(root.progress, 0, 1);
+                                height: parent.height;
+                                border-radius: 3px;
+                                background: Theme.accent;
+                                animate width { duration: 200ms; }
+                            }
+                        }
+                    }
+
+                    // Грати
+                    Rectangle {
+                        y: 16px;
+                        width: 230px;
+                        height: 64px;
+                        border-radius: 16px;
+                        property <bool> can-play: !root.busy && !root.game-running && root.has-account;
+                        background: self.can-play ? Theme.accent : (root.game-running ? #4dffa61f : #ffffff14);
+                        drop-shadow-blur: self.can-play ? (play-ta.has-hover ? 46px : 30px) : 0;
+                        drop-shadow-color: self.can-play ? #3cf2ff77 : transparent;
+                        drop-shadow-offset-y: self.can-play ? 8px : 0;
+                        animate drop-shadow-blur { duration: 180ms; }
+                        Text {
+                            text: root.game-running ? "ГРА ЗАПУЩЕНА" : (root.busy ? round(root.progress * 100) + "%" : "ГРАТИ");
+                            font-family: Theme.display;
+                            font-weight: 800;
+                            font-size: root.game-running ? 15px : 22px;
+                            letter-spacing: 2px;
+                            color: parent.can-play ? #04060b : (root.game-running ? Theme.green : Theme.muted);
+                        }
+                        play-ta := TouchArea {
+                            enabled: parent.can-play;
+                            mouse-cursor: parent.can-play ? pointer : default;
+                            clicked => { root.play(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------- Акаунти ----------
+    if root.accounts-open: Rectangle {
+        background: #03050ad0;
+        TouchArea {
+            clicked => {
+                if (!root.ms-waiting) { root.accounts-open = false; }
+            }
+        }
+        Rectangle {
+            width: 460px;
+            height: box.preferred-height;
+            border-radius: 22px;
+            background: Theme.bg2;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            drop-shadow-blur: 60px;
+            drop-shadow-color: #3cf2ff30;
+            TouchArea { }
+            box := VerticalLayout {
+                padding: 26px;
+                spacing: 14px;
+                HorizontalLayout {
+                    SectionTitle { text: "Акаунти"; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Rectangle {
+                        width: 34px;
+                        height: 34px;
+                        border-radius: 10px;
+                        border-width: 1px;
+                        border-color: Theme.line-strong;
+                        Text { text: "×"; font-size: 20px; color: Theme.text; }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.ms-cancel();
+                                root.accounts-open = false;
+                            }
+                        }
+                    }
+                }
+
+                for a in root.accounts: Rectangle {
+                    height: 58px;
+                    border-radius: 14px;
+                    background: a.selected ? #3cf2ff14 : (row-ta.has-hover ? #ffffff0a : transparent);
+                    border-width: 1px;
+                    border-color: a.selected ? #3cf2ff59 : Theme.line;
+                    row-ta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.select-account(a.id); }
+                    }
+                    HorizontalLayout {
+                        padding: 9px;
+                        padding-right: 6px;
+                        spacing: 12px;
+                        Avatar { size: 40px; face: a.face; has-face: a.has-face; initial: a.initial; }
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            Text { text: a.name; font-weight: 700; color: Theme.text; overflow: elide; }
+                            Text { text: a.licensed ? "ліцензія" : "без ліцензії"; font-family: Theme.mono; font-size: 11px; color: a.licensed ? Theme.green : Theme.muted; }
+                        }
+                        Rectangle {
+                            width: 34px;
+                            border-radius: 9px;
+                            background: del-ta.has-hover ? #ff5c7a1f : transparent;
+                            Text { text: "✕"; color: del-ta.has-hover ? Theme.red : Theme.muted; }
+                            del-ta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.remove-account(a.id); }
+                            }
+                        }
+                    }
+                }
+
+                if root.accounts.length > 0: Rectangle { height: 1px; background: Theme.line; }
+
+                // Вхід через Microsoft
+                if !root.ms-waiting: Button {
+                    text: root.ms-available ? "Увійти з ліцензією Microsoft" : "Ліцензія поки недоступна";
+                    primary: root.ms-available;
+                    enabled: root.ms-available;
+                    clicked => { root.ms-login(); }
+                }
+                if root.ms-waiting: Rectangle {
+                    border-radius: 16px;
+                    background: #3cf2ff0d;
+                    border-width: 1px;
+                    border-color: #3cf2ff40;
+                    height: ms-box.preferred-height;
+                    ms-box := VerticalLayout {
+                        padding: 18px;
+                        spacing: 10px;
+                        Text {
+                            text: root.ms-code == "" ? "Підключаємося до Microsoft…" : "Відкрий сторінку входу й введи код:";
+                            color: Theme.muted;
+                            horizontal-alignment: center;
+                        }
+                        if root.ms-code != "": TextInput {
+                            text: root.ms-code;
+                            read-only: true;
+                            font-family: Theme.mono;
+                            font-size: 30px;
+                            letter-spacing: 4px;
+                            color: Theme.cyan;
+                            horizontal-alignment: center;
+                            selection-background-color: #3cf2ff55;
+                        }
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 10px;
+                            if root.ms-code != "": Button { text: "Відкрити сторінку входу"; primary: true; clicked => { root.open-url(root.ms-url); } }
+                            Button { text: "Скасувати"; clicked => { root.ms-cancel(); } }
+                        }
+                    }
+                }
+
+                // Без ліцензії
+                Text { text: "Без ліцензії"; font-weight: 700; color: Theme.text; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    nick := Field {
+                        horizontal-stretch: 1;
+                        placeholder: "Нік, напр. Steve_UA";
+                        text <=> root.offline-nick;
+                        accepted(t) => { root.add-offline(t); }
+                    }
+                    Button { text: "Додати"; width: 100px; clicked => { root.add-offline(root.offline-nick); } }
+                }
+                Text {
+                    text: "Нік — 3–16 символів: латиниця, цифри й _. На сервері вхід захищає пароль /login.";
+                    font-size: 12px;
+                    color: Theme.muted;
+                    wrap: word-wrap;
+                }
+                if root.acc-error != "": Text {
+                    text: root.acc-error;
+                    color: Theme.red;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+
+    // ---------- Сповіщення ----------
+    if root.toast != "": Rectangle {
+        y: parent.height - 150px;
+        x: (parent.width - self.width) / 2;
+        width: min(toast-t.preferred-width + 40px, parent.width - 80px);
+        height: toast-t.preferred-height + 24px;
+        border-radius: 12px;
+        background: #161f35f2;
+        border-width: 1px;
+        border-color: Theme.red;
+        toast-t := Text {
+            width: parent.width - 40px;
+            text: root.toast;
+            color: Theme.text;
+            font-weight: 700;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+        }
+    }
+}
