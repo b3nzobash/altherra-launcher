@@ -233,6 +233,8 @@ export component AppWindow inherits Window {
     in-out property <string> jvm-args: "";
     in-out property <int> after-launch: 1;
     in-out property <bool> auto-connect: true;
+    in-out property <bool> auto-sync: false;
+    in property <bool> autosync-ask: false;
     in property <string> game-dir: "";
     in property <string> version: "";
 
@@ -253,6 +255,7 @@ export component AppWindow inherits Window {
     callback refresh();
     callback kill-game();
     callback do-update();
+    callback autosync-answer(bool);
 
     Image {
         width: parent.width;
@@ -561,6 +564,12 @@ export component AppWindow inherits Window {
                                     title: "Одразу заходити на сервер";
                                     hint: "Гра після запуску сама підключиться до Altherra.";
                                     Toggle { y: 20px; checked <=> root.auto-connect; toggled => { root.save-settings(); } }
+                                }
+                                Rectangle { height: 1px; background: Theme.line; }
+                                SettingRow {
+                                    title: "Оновлювати збірку автоматично";
+                                    hint: "Коли адміністрація змінює моди, лаунчер сам завантажить зміни у фоні.";
+                                    Toggle { y: 20px; checked <=> root.auto-sync; toggled => { root.save-settings(); } }
                                 }
                                 Rectangle { height: 1px; background: Theme.line; }
                                 SettingRow {
@@ -916,6 +925,41 @@ export component AppWindow inherits Window {
                     color: Theme.red;
                     font-size: 13px;
                     wrap: word-wrap;
+                }
+            }
+        }
+    }
+
+    // ---------- Питання після першого входу ----------
+    if root.autosync-ask && !root.accounts-open: Rectangle {
+        background: Theme.bg.with-alpha(0.82);
+        TouchArea { }
+        Rectangle {
+            width: 440px;
+            height: ask-box.preferred-height;
+            background: Theme.bg2;
+            border-width: 2px;
+            border-color: Theme.line-strong;
+            ask-box := VerticalLayout {
+                padding: 26px;
+                spacing: 14px;
+                SectionTitle { text: "Оновлювати збірку автоматично?"; font-size: 18px; wrap: word-wrap; }
+                Text {
+                    text: "Коли адміністрація змінює моди чи версію гри, лаунчер сам завантажить зміни у фоні. Тоді «Грати» запускатиме гру одразу, без очікування.";
+                    color: Theme.muted;
+                    wrap: word-wrap;
+                    font-size: 13px;
+                }
+                Text {
+                    text: "Це можна змінити будь-коли в «Налаштуваннях».";
+                    color: Theme.muted;
+                    wrap: word-wrap;
+                    font-size: 12px;
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Button { text: "Так, оновлювати"; primary: true; horizontal-stretch: 1; clicked => { root.autosync-answer(true); } }
+                    Button { text: "Ні, при запуску гри"; horizontal-stretch: 1; clicked => { root.autosync-answer(false); } }
                 }
             }
         }
