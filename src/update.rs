@@ -64,7 +64,7 @@ struct Release {
 
 /// «launcher-v1.2.3» / «v1.2.3» / «1.2.3» → (1, 2, 3)
 fn parse_version(s: &str) -> Option<(u32, u32, u32)> {
-    let v = s.trim_start_matches("launcher-").trim_start_matches('v');
+    let v = s.trim_start_matches("launcher-").trim_start_matches("offline-").trim_start_matches('v');
     let mut it = v.split('.').map(|p| p.parse::<u32>().ok());
     Some((it.next()??, it.next()??, it.next().unwrap_or(Some(0))?))
 }
@@ -73,16 +73,25 @@ pub fn current() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// Префікс тегів релізів цієї версії: основна — «launcher-v…», Offline — «offline-v…» (окрема гілка).
+pub fn tag_prefix() -> &'static str {
+    if crate::OFFICIAL { "launcher-v" } else { "offline-v" }
+}
+
 pub async fn check() -> Result<Option<Available>> {
-    let r: Release = net::get_json(&format!("https://api.github.com/repos/{REPO}/releases/latest")).await?;
-    if r.draft || r.prerelease {
-        return Ok(None);
-    }
-    let (Some(latest), Some(cur)) = (parse_version(&r.tag_name), parse_version(current())) else { return Ok(None) };
+    // Релізи обох версій лежать в одному репозиторії — беремо найновіший саме своєї.
+    let list: Vec<Release> = net::get_json(&format!("https://api.github.com/repos/{REPO}/releases?per_page=30")).await?;
+    let Some(cur) = parse_version(current()) else { return Ok(None) };
+    let best = list
+        .into_iter()
+        .filter(|r| !r.draft && !r.prerelease && r.tag_name.starts_with(tag_prefix()))
+        .filter_map(|r| parse_version(r.tag_name.trim_start_matches(tag_prefix())).map(|v| (v, r)))
+        .max_by_key(|(v, _)| *v);
+    let Some((latest, r)) = best else { return Ok(None) };
     if latest <= cur {
         return Ok(None);
     }
-    let page = if r.html_url.starts_with("https://github.com/") { r.html_url } else { format!("https://github.com/{REPO}/releases/latest") };
+    let page = if r.html_url.starts_with("https://github.com/") { r.html_url } else { format!("https://github.com/{REPO}/releases") };
     Ok(Some(Available { version: format!("{}.{}.{}", latest.0, latest.1, latest.2), page, tag: r.tag_name }))
 }
 

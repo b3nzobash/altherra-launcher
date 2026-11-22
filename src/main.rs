@@ -8,6 +8,7 @@ mod mojang;
 mod net;
 mod paths;
 mod ping;
+mod required;
 mod servers;
 mod settings;
 mod update;

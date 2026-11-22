@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "altherra-client",
+  "version": "${version}",
+  "name": "Altherra Client",
+  "description": "Для сервера Altherra: після кіку гра сама перепідключається, а кнопка «Вийти з гри» в меню паузи закриває Minecraft.",
+  "authors": ["Altherra"],
+  "contact": { "homepage": "https://altherra.com.ua" },
+  "license": "All-Rights-Reserved",
+  "icon": "assets/altherra-client/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["ua.altherra.client.AltherraClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.20.0",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

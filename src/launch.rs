@@ -63,10 +63,12 @@ pub async fn prepare(m: &Manifest, settings: &Settings, check_hash: bool, rep: s
 
     // Моди й інші файли збірки
     rep.stage("Синхронізуємо моди…", 0.86);
-    let files = manifest::plan_sync(m)?;
+    // Збірка сервера + обовʼязковий мод Altherra Client (і Fabric API для нього).
+    let full = crate::required::with_required(m).await?;
+    let files = manifest::plan_sync(&full)?;
     let r = rep.clone();
     net::download_all(files, 8, true, move |d, t, b| r.stage(&format!("Моди · {d} / {t} · {}", fmt_mb(b)), 0.86 + 0.13 * d as f32 / t as f32)).await?;
-    manifest::save_sync_state(m);
+    manifest::save_sync_state(&full);
 
     rep.stage("Запускаємо…", 1.0);
     Ok(Prepared { profile, java, classpath })
