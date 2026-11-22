@@ -1,8 +1,12 @@
 <p align="center"><img src="assets/icon.png" width="112" alt=""></p>
 
-<h1 align="center">Altherra Launcher</h1>
+<h1 align="center">Altherra Offline</h1>
 
 <p align="center">Лаунчер Minecraft-сервера <b>Altherra</b>. Швидкий, нативний, без зайвого.</p>
+
+
+> **Гілка `offline`** — Altherra Offline: лише вхід за ніком, без входу Microsoft, червоне оформлення.
+> Основна версія лаунчера — у гілці [`main`](../../tree/main). Релізи цієї гілки — `offline-v…`.
 
 ---
 

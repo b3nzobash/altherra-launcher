@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 # Офіційна збірка: вхід з ліцензією Microsoft. Без неї (--no-default-features) — Altherra Offline, лише вхід за ніком.
-default = ["microsoft"]
+default = []
 microsoft = []
 
 [dependencies]
