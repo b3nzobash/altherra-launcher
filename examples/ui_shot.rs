@@ -89,9 +89,6 @@ fn main() {
     ui.set_page(0);
     ui.global::<Theme>().set_offline(false);
     ui.set_edition_official(true);
-    ui.set_autosync_ask(true);
-    shot(&win, w, h, &format!("{out}/ui-autosync.png"));
-    ui.set_autosync_ask(false);
     for (i, name) in [(1, "build"), (2, "settings"), (3, "log")] {
         ui.set_page(i);
         shot(&win, w, h, &format!("{out}/ui-{name}.png"));

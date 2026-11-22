@@ -15,15 +15,11 @@ pub struct Settings {
     pub auto_connect: bool,
     pub width: u32,
     pub height: u32,
-    /// Оновлювати збірку у фоні, коли на сервері її змінили. None — ще не питали.
-    pub auto_sync: Option<bool>,
-    /// Ревізія збірки, яку востаннє повністю встановлено.
-    pub synced_revision: u64,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { ram_mb: 0, java_path: String::new(), jvm_args: String::new(), after_launch: "minimize".into(), auto_connect: true, width: 0, height: 0, auto_sync: None, synced_revision: 0 }
+        Self { ram_mb: 0, java_path: String::new(), jvm_args: String::new(), after_launch: "minimize".into(), auto_connect: true, width: 0, height: 0 }
     }
 }
 
