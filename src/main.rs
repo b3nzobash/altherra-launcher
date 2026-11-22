@@ -175,6 +175,7 @@ fn push_settings(ui: &AppWindow, s: &Settings, recommended_mb: u32) {
     ui.set_java_path(s.java_path.clone().into());
     ui.set_jvm_args(s.jvm_args.clone().into());
     ui.set_auto_connect(s.auto_connect);
+    ui.set_auto_sync(s.auto_sync == Some(true));
     ui.set_after_launch(match s.after_launch.as_str() {
         "keep" => 0,
         "close" => 2,
@@ -379,6 +380,34 @@ impl launch::Reporter for UiReporter {
     }
 }
 
+/// Раз на 5 хвилин: якщо гравець дозволив автооновлення і збірку на сервері змінили — підтягуємо у фоні.
+fn auto_sync_loop(weak: Weak<AppWindow>, state: Shared) {
+    rt().spawn(async move {
+        tokio::time::sleep(Duration::from_secs(20)).await;
+        loop {
+            let (enabled, idle, synced) = {
+                let st = state.lock().unwrap();
+                (st.settings.auto_sync == Some(true) && !st.accounts.list.is_empty(), !st.busy && !st.game_running, st.settings.synced_revision)
+            };
+            if enabled && idle {
+                if let Ok((m, true)) = manifest::fetch().await {
+                    if m.revision != synced {
+                        run(weak.clone(), state.clone(), false, false);
+                    }
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(300)).await;
+        }
+    });
+}
+
+/// Після першого входу питаємо, чи оновлювати збірку автоматично.
+fn maybe_ask_auto_sync(ui: &AppWindow, st: &State) {
+    if st.settings.auto_sync.is_none() && !st.accounts.list.is_empty() {
+        ui.set_autosync_ask(true);
+    }
+}
+
 fn set_busy(weak: &Weak<AppWindow>, state: &Shared, busy: bool, text: &str) {
     state.lock().unwrap().busy = busy;
     let text = text.to_owned();
@@ -435,8 +464,13 @@ fn run(weak: Weak<AppWindow>, state: Shared, launch_game: bool, check_hash: bool
             };
             let reporter = Arc::new(UiReporter(weak.clone(), Mutex::new(std::time::Instant::now())));
             let prepared = launch::prepare(&m, &settings, check_hash, reporter).await?;
+            {
+                let mut st = state.lock().unwrap();
+                st.settings.synced_revision = m.revision;
+                st.settings.save();
+            }
             if !launch_game {
-                set_busy(&weak, &state, false, "Файли перевірено — усе на місці.");
+                set_busy(&weak, &state, false, if check_hash { "Файли перевірено — усе на місці." } else { "Збірку оновлено — можна грати." });
                 return Ok(());
             }
             let account = account.expect("account");
@@ -584,6 +618,7 @@ fn main() -> Result<(), slint::PlatformError> {
         let st = state.lock().unwrap();
         push_accounts(&ui, &st);
         push_settings(&ui, &st.settings, 4096);
+        maybe_ask_auto_sync(&ui, &st);
         // Збережений маніфест показуємо одразу, поки йде запит до сервера.
         if let Some(m) = std::fs::read(paths::manifest_cache()).ok().and_then(|b| serde_json::from_slice::<Manifest>(&b).ok()) {
             push_manifest(&ui, &m, true);
@@ -597,6 +632,24 @@ fn main() -> Result<(), slint::PlatformError> {
     }
     load_manifest(ui.as_weak(), state.clone());
     ping_loop(ui.as_weak(), state.clone());
+    auto_sync_loop(ui.as_weak(), state.clone());
+    {
+        let (weak, state) = (ui.as_weak(), state.clone());
+        ui.on_autosync_answer(move |yes| {
+            let Some(ui) = weak.upgrade() else { return };
+            {
+                let mut st = state.lock().unwrap();
+                st.settings.auto_sync = Some(yes);
+                st.settings.save();
+            }
+            ui.set_autosync_ask(false);
+            ui.set_auto_sync(yes);
+            // Погодився — одразу підтягуємо збірку, щоб «Грати» запускало гру без очікування.
+            if yes {
+                run(weak.clone(), state.clone(), false, false);
+            }
+        });
+    }
 
     // Оновлення лаунчера: перевіряємо при старті, ставимо за кнопкою.
     let pending_update: Arc<Mutex<Option<update::Available>>> = Arc::default();
@@ -742,6 +795,9 @@ fn main() -> Result<(), slint::PlatformError> {
             st.settings.java_path = ui.get_java_path().to_string();
             st.settings.jvm_args = ui.get_jvm_args().to_string();
             st.settings.auto_connect = ui.get_auto_connect();
+            if st.settings.auto_sync.is_some() || ui.get_auto_sync() {
+                st.settings.auto_sync = Some(ui.get_auto_sync());
+            }
             st.settings.after_launch = ["keep", "minimize", "close"][ui.get_after_launch().clamp(0, 2) as usize].to_owned();
             st.settings.save();
         });
@@ -792,6 +848,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     ui.set_offline_nick("".into());
                     ui.set_acc_error("".into());
                     ui.set_accounts_open(false);
+                    maybe_ask_auto_sync(&ui, &st);
                 }
                 Err(e) => ui.set_acc_error(e.to_string().into()),
             }
@@ -839,10 +896,14 @@ fn main() -> Result<(), slint::PlatformError> {
                         let st = state.clone();
                         let _ = weak.upgrade_in_event_loop(move |ui| {
                             ui.set_ms_waiting(false);
-                            push_accounts(&ui, &st.lock().unwrap());
+                            let guard = st.lock().unwrap();
+                            push_accounts(&ui, &guard);
                             match save_err {
                                 Some(e) => ui.set_acc_error(format!("Не вдалося зберегти акаунт: {e}").into()),
-                                None => ui.set_accounts_open(false),
+                                None => {
+                                    ui.set_accounts_open(false);
+                                    maybe_ask_auto_sync(&ui, &guard);
+                                }
                             }
                         });
                     }
