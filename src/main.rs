@@ -8,6 +8,7 @@ mod mojang;
 mod net;
 mod paths;
 mod ping;
+mod servers;
 mod settings;
 mod update;
 
@@ -206,26 +207,91 @@ fn load_manifest(weak: Weak<AppWindow>, state: Shared) {
     });
 }
 
+/// Статистика з сервера лаунчера (/api/stats).
+#[derive(serde::Deserialize)]
+struct Stats {
+    status: String,
+    players: u32,
+    max: u32,
+    tps: Option<f64>,
+    uptime: Option<u64>,
+    today: StatsToday,
+    history: StatsHistory,
+}
+#[derive(serde::Deserialize)]
+struct StatsToday {
+    peak: u32,
+    unique: Option<u32>,
+}
+#[derive(serde::Deserialize)]
+struct StatsHistory {
+    points: Vec<(u64, Option<u32>)>,
+}
+
+/// SVG-шлях графіка гравців у полі 100×30.
+fn spark_path(points: &[(u64, Option<u32>)], max: u32) -> String {
+    let n = points.len().max(2) as f32 - 1.0;
+    let top = max.max(1) as f32;
+    let mut out = String::new();
+    let mut pen_down = false;
+    for (i, (_, v)) in points.iter().enumerate() {
+        let Some(v) = v else {
+            pen_down = false;
+            continue;
+        };
+        let x = i as f32 / n * 100.0;
+        let y = 30.0 - (*v as f32 / top).min(1.0) * 28.0 - 1.0;
+        out += &format!("{}{x:.1} {y:.1} ", if pen_down { "L" } else { "M" });
+        pen_down = true;
+    }
+    out
+}
+
+fn fmt_uptime(secs: u64) -> String {
+    let (d, h, m) = (secs / 86400, secs % 86400 / 3600, secs % 3600 / 60);
+    if d > 0 { format!("{d} д {h} год") } else if h > 0 { format!("{h} год {m} хв") } else { format!("{m} хв") }
+}
+
 fn ping_loop(weak: Weak<AppWindow>, state: Shared) {
     rt().spawn(async move {
         loop {
             let address = state.lock().unwrap().manifest.as_ref().map(|m| m.server_address.clone()).unwrap_or_default();
-            if !address.is_empty() {
-                let res = ping::status(&address).await;
-                let _ = weak.upgrade_in_event_loop(move |ui| match res {
-                    Ok(s) => {
-                        ui.set_server_state(1);
-                        ui.set_server_status(format!("онлайн · {} / {}", s.online, s.max).into());
-                    }
-                    Err(_) => {
-                        ui.set_server_state(2);
-                        ui.set_server_status("сервер вимкнений".into());
-                    }
-                });
-                tokio::time::sleep(Duration::from_secs(30)).await;
-            } else {
-                tokio::time::sleep(Duration::from_secs(2)).await;
+            // Спершу статистика демона (з графіком), а якщо він недоступний — пряме опитування сервера.
+            match net::get_json::<Stats>(&format!("{}/api/stats", manifest::api_url())).await {
+                Ok(s) if s.status != "unknown" => {
+                    let peak_top = s.history.points.iter().filter_map(|p| p.1).max().unwrap_or(0).max(s.today.peak);
+                    let spark = spark_path(&s.history.points, peak_top.max(4));
+                    let _ = weak.upgrade_in_event_loop(move |ui| {
+                        let online = s.status == "online";
+                        ui.set_server_state(if online { 1 } else { 2 });
+                        ui.set_server_status(if online { format!("онлайн · {} / {}", s.players, s.max) } else { "сервер вимкнений".to_owned() }.into());
+                        ui.set_stats_visible(true);
+                        ui.set_stats_spark(spark.into());
+                        ui.set_stats_peak(s.today.peak.to_string().into());
+                        ui.set_stats_unique(s.today.unique.map(|u| u.to_string()).unwrap_or_else(|| "—".into()).into());
+                        ui.set_stats_tps(s.tps.map(|t| format!("{t:.1}")).unwrap_or_else(|| "—".into()).into());
+                        ui.set_stats_uptime(s.uptime.filter(|_| online).map(fmt_uptime).unwrap_or_else(|| "—".into()).into());
+                    });
+                }
+                _ if !address.is_empty() => {
+                    let res = ping::status(&address).await;
+                    let _ = weak.upgrade_in_event_loop(move |ui| match res {
+                        Ok(s) => {
+                            ui.set_server_state(1);
+                            ui.set_server_status(format!("онлайн · {} / {}", s.online, s.max).into());
+                        }
+                        Err(_) => {
+                            ui.set_server_state(2);
+                            ui.set_server_status("сервер вимкнений".into());
+                        }
+                    });
+                }
+                _ => {
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                    continue;
+                }
             }
+            tokio::time::sleep(Duration::from_secs(30)).await;
         }
     });
 }
@@ -502,6 +568,11 @@ fn main() -> Result<(), slint::PlatformError> {
         return Ok(());
     }
     let ui = AppWindow::new()?;
+    // На Linux панель задач шукає ярлик (і його іконку) за цим ідентифікатором — у кожної версії свій.
+    // Задається до показу вікна.
+    if let Err(e) = slint::set_xdg_app_id(if OFFICIAL { "altherra-launcher" } else { "altherra-offline" }) {
+        eprintln!("app_id: {e}");
+    }
     let state: Shared = Arc::new(Mutex::new(State { accounts: Accounts::load(), settings: Settings::load(), ..Default::default() }));
 
     ui.set_version(env!("CARGO_PKG_VERSION").into());

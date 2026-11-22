@@ -47,6 +47,12 @@ fn main() {
         FileItem { name: "Altherra UI".into(), dir: "resourcepacks".into(), size: "640 КБ".into() },
     ])));
     ui.set_log_lines(ModelRc::new(VecModel::from(vec!["[19:52:01] [Render thread/INFO]: Setting user: b3nzobash".into(), "[19:52:03] [Render thread/INFO]: Backend library: LWJGL version 3.4.3".into()])));
+    ui.set_stats_visible(true);
+    ui.set_stats_spark("M0 25 L10 22 L20 26 L30 18 L40 12 L50 14 L60 8 L70 10 L80 5 L90 9 L100 7".into());
+    ui.set_stats_peak("12".into());
+    ui.set_stats_unique("27".into());
+    ui.set_stats_tps("19.9".into());
+    ui.set_stats_uptime("3 д 4 год".into());
     ui.show().unwrap();
 
     shot(&win, w, h, &format!("{out}/ui-home-empty.png"));

@@ -118,6 +118,7 @@ Comment=Лаунчер сервера Altherra
 Exec=$DEST/$ID
 Icon=$ID
 Terminal=false
+StartupWMClass=$ID
 Categories=Game;
 Keywords=minecraft;altherra;launcher;
 Actions=Uninstall;

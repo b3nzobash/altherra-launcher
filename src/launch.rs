@@ -152,6 +152,12 @@ pub fn spawn(p: &Prepared, m: &Manifest, s: &Settings, acc: &Account, on_line: i
     let sep = if cfg!(windows) { ";" } else { ":" };
     let cp = p.classpath.iter().map(|x| x.to_string_lossy().into_owned()).collect::<Vec<_>>().join(sep);
 
+    // Сервер завжди в списку «Мережева гра» — щоб після кіку можна було перезайти.
+    if !m.server_address.trim().is_empty() {
+        if let Err(e) = crate::servers::ensure_server(&game.join("servers.dat"), if m.name.is_empty() { "Altherra" } else { &m.name }, m.server_address.trim()) {
+            on_line(format!("[лаунчер] не вдалося оновити список серверів: {e}"));
+        }
+    }
     let ram = if s.ram_mb > 0 { s.ram_mb } else { m.recommended_ram_mb.max(2048) };
     let server = m.server_address.trim();
     let connect = s.auto_connect && !server.is_empty();
