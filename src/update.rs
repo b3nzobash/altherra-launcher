@@ -35,12 +35,14 @@ const fn hex_key(s: &str) -> [u8; 32] {
 
 /// Файл релізу для цієї системи. На macOS оновлюємо через сторінку завантаження.
 pub fn asset_name() -> Option<&'static str> {
+    // Кожна збірка оновлюється лише до своєї: офіційна — до офіційної, Offline — до Offline.
+    let official = crate::OFFICIAL;
     if cfg!(all(windows, target_arch = "x86_64")) {
-        Some("Altherra-windows-x64.exe")
+        Some(if official { "Altherra-windows-x64.exe" } else { "Altherra-Offline-windows-x64.exe" })
     } else if cfg!(all(target_os = "linux", target_arch = "x86_64", target_env = "musl")) {
-        Some("altherra-launcher-linux-x64-musl")
+        Some(if official { "altherra-launcher-linux-x64-musl" } else { "altherra-offline-linux-x64-musl" })
     } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        Some("altherra-launcher-linux-x64-gnu")
+        Some(if official { "altherra-launcher-linux-x64-gnu" } else { "altherra-offline-linux-x64-gnu" })
     } else {
         None
     }

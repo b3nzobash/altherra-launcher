@@ -22,6 +22,15 @@ use std::time::Duration;
 
 slint::include_modules!();
 
+/// Офіційна збірка (з ліцензією Microsoft) чи Altherra Offline.
+pub const OFFICIAL: bool = cfg!(feature = "microsoft");
+pub const PRODUCT: &str = if OFFICIAL { "Altherra" } else { "Altherra Offline" };
+
+/// В офіційній збірці гра за ніком доступна лише тоді, коли в лаунчері є ліцензійний акаунт.
+fn offline_allowed(acc: &Accounts) -> bool {
+    !OFFICIAL || acc.list.iter().any(|a| a.kind == Kind::Microsoft)
+}
+
 const MAX_LOG_LINES: usize = 3000;
 
 /// Спільний стан між інтерфейсом і фоновими задачами.
@@ -111,6 +120,7 @@ fn push_accounts(ui: &AppWindow, st: &State) {
         })
         .collect();
     let current = items.iter().find(|a| a.selected).cloned();
+    ui.set_offline_allowed(offline_allowed(&st.accounts));
     ui.set_has_account(current.is_some());
     if let Some(c) = current {
         ui.set_account(c);
@@ -131,7 +141,7 @@ fn push_manifest(ui: &AppWindow, m: &Manifest, online: bool) {
     ui.set_mods_count(mods as i32);
     ui.set_manifest_offline(!online);
     ui.set_manifest_error("".into());
-    ui.set_ms_available(!ms_client_id(m).is_empty());
+    ui.set_ms_available(OFFICIAL && !ms_client_id(m).is_empty());
     ui.set_ram_recommended((m.recommended_ram_mb.max(1024) as f32 / 1024.0).round());
     let mut info = format!("Minecraft {}", m.minecraft);
     if !loader.is_empty() {
@@ -340,7 +350,13 @@ fn run(weak: Weak<AppWindow>, state: Shared, launch_game: bool, check_hash: bool
             let account = match (launch_game, account) {
                 (true, None) => anyhow::bail!("Спершу додай акаунт"),
                 (true, Some(a)) => {
+                    if a.kind == Kind::Offline && !offline_allowed(&state.lock().unwrap().accounts) {
+                        anyhow::bail!("Гра без ліцензії доступна після входу з ліцензійним акаунтом. Або завантаж Altherra Offline.");
+                    }
+                    #[cfg(feature = "microsoft")]
                     let fresh = auth::ensure_fresh(&a, &ms_client_id(&m)).await?;
+                    #[cfg(not(feature = "microsoft"))]
+                    let fresh = a.clone();
                     if fresh.access_token != a.access_token {
                         let mut st = state.lock().unwrap();
                         st.accounts.upsert(fresh.clone());
@@ -450,6 +466,9 @@ fn cli(args: &[String]) -> anyhow::Result<()> {
     }
     let verify = args.iter().any(|a| a == "verify");
     let nick = args.iter().position(|a| a == "--offline").and_then(|i| args.get(i + 1));
+    if nick.is_some() && !offline_allowed(&Accounts::load()) {
+        anyhow::bail!("в офіційній збірці гра без ліцензії доступна після входу з ліцензійним акаунтом");
+    }
     rt().block_on(async {
         let (m, online) = manifest::fetch().await?;
         eprintln!("Збірка: Minecraft {} · {} {} · {} файлів · ревізія {}{}", m.minecraft, m.loader.kind, m.loader.version, m.files.len(), m.revision, if online { "" } else { " (з кешу)" });
@@ -486,6 +505,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let state: Shared = Arc::new(Mutex::new(State { accounts: Accounts::load(), settings: Settings::load(), ..Default::default() }));
 
     ui.set_version(env!("CARGO_PKG_VERSION").into());
+    ui.set_edition_official(OFFICIAL);
     ui.set_game_dir(paths::game_dir().to_string_lossy().into_owned().into());
     {
         let st = state.lock().unwrap();
@@ -683,6 +703,10 @@ fn main() -> Result<(), slint::PlatformError> {
         let (weak, state) = (ui.as_weak(), state.clone());
         ui.on_add_offline(move |nick| {
             let Some(ui) = weak.upgrade() else { return };
+            if !offline_allowed(&state.lock().unwrap().accounts) {
+                ui.set_acc_error("Спершу увійди з ліцензією Microsoft — після цього можна додавати й ніки без ліцензії.".into());
+                return;
+            }
             match auth::offline(nick.trim()) {
                 Ok(acc) => {
                     let mut st = state.lock().unwrap();
@@ -700,6 +724,8 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         });
     }
+    // Вхід через Microsoft є лише в офіційній збірці; в Altherra Offline цього коду немає зовсім.
+    #[cfg(feature = "microsoft")]
     {
         let (weak, state) = (ui.as_weak(), state.clone());
         ui.on_ms_login(move || {

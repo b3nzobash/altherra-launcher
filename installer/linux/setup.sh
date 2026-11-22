@@ -6,8 +6,8 @@
 # Ставиться лише для поточного користувача, права root не потрібні.
 set -eu
 
-APP="Altherra"
-ID="altherra-launcher"
+APP="@APP@"
+ID="@ID@"
 DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
 DEST="$DATA/$ID"
 BIN_DIR="$HOME/.local/bin"
@@ -120,11 +120,10 @@ Icon=$ID
 Terminal=false
 Categories=Game;
 Keywords=minecraft;altherra;launcher;
-StartupWMClass=altherra-launcher
 Actions=Uninstall;
 
 [Desktop Action Uninstall]
-Name=Видалити Altherra
+Name=Видалити $APP
 Exec=sh "$DEST/uninstall.run" --uninstall
 EOF
 chmod 644 "$DESKTOP"

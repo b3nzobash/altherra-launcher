@@ -1,7 +1,12 @@
 [package]
 name = "altherra-launcher"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2024"
+
+[features]
+# Офіційна збірка: вхід з ліцензією Microsoft. Без неї (--no-default-features) — Altherra Offline, лише вхід за ніком.
+default = ["microsoft"]
+microsoft = []
 
 [dependencies]
 anyhow = "1.0.104"

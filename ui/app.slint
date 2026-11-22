@@ -187,7 +187,9 @@ component SettingRow inherits Rectangle {
 }
 
 export component AppWindow inherits Window {
-    title: "Altherra";
+    in property <bool> edition-official: true;
+    in property <bool> offline-allowed: true;
+    title: root.edition-official ? "Altherra" : "Altherra Offline";
     icon: @image-url("../assets/icon.png");
     preferred-width: 1120px;
     preferred-height: 700px;
@@ -603,7 +605,7 @@ export component AppWindow inherits Window {
                                 }
                             }
                         }
-                        Text { text: "Altherra Launcher " + root.version + " · Made with Slint"; font-family: Theme.mono; font-size: 11px; color: #8a97ad88; }
+                        Text { text: (root.edition-official ? "Altherra Launcher " : "Altherra Offline ") + root.version + " · Made with Slint"; font-family: Theme.mono; font-size: 11px; color: #8a97ad88; }
                     }
                 }
 
@@ -833,13 +835,13 @@ export component AppWindow inherits Window {
                 if root.accounts.length > 0: Rectangle { height: 1px; background: Theme.line; }
 
                 // Вхід через Microsoft
-                if !root.ms-waiting: Button {
+                if root.edition-official && !root.ms-waiting: Button {
                     text: root.ms-available ? "Увійти з ліцензією Microsoft" : "Ліцензія поки недоступна";
                     primary: root.ms-available;
                     enabled: root.ms-available;
                     clicked => { root.ms-login(); }
                 }
-                if root.ms-waiting: Rectangle {
+                if root.edition-official && root.ms-waiting: Rectangle {
                     border-radius: 16px;
                     background: #3cf2ff0d;
                     border-width: 1px;
@@ -873,19 +875,22 @@ export component AppWindow inherits Window {
                 }
 
                 // Без ліцензії
-                Text { text: "Без ліцензії"; font-weight: 700; color: Theme.text; }
+                Text { text: root.edition-official ? "Без ліцензії" : "Твій нік"; font-weight: 700; color: Theme.text; }
                 HorizontalLayout {
                     spacing: 10px;
                     nick := Field {
                         horizontal-stretch: 1;
-                        placeholder: "Нік, напр. Steve_UA";
+                        enabled: root.offline-allowed;
+                        placeholder: root.offline-allowed ? "Нік, напр. Steve_UA" : "Спершу увійди з ліцензією";
                         text <=> root.offline-nick;
                         accepted(t) => { root.add-offline(t); }
                     }
-                    Button { text: "Додати"; width: 100px; clicked => { root.add-offline(root.offline-nick); } }
+                    Button { text: "Додати"; width: 100px; enabled: root.offline-allowed; clicked => { root.add-offline(root.offline-nick); } }
                 }
                 Text {
-                    text: "Нік — 3–16 символів: латиниця, цифри й _. На сервері вхід захищає пароль /login.";
+                    text: root.offline-allowed
+                        ? "Нік — 3–16 символів: латиниця, цифри й _. На сервері вхід захищає пароль /login."
+                        : "У цій версії гра за ніком відкривається після входу з ліцензією. Немає ліцензії — завантаж Altherra Offline із сайту.";
                     font-size: 12px;
                     color: Theme.muted;
                     wrap: word-wrap;

@@ -12,22 +12,35 @@
 - **Легкий.** Один файл на Rust + [Slint](https://slint.dev) без браузера всередині: відкривається миттєво й майже не їсть памʼяті.
 - **Надійний.** Кожен файл перевіряється за контрольною сумою, а невдалі завантаження повторюються. Лаунчер ходить в інтернет лише через HTTPS і не дає серверу збірки виконати щось поза грою.
 
+## Дві версії
+
+| | **Altherra** | **Altherra Offline** |
+|---|---|---|
+| Вхід з ліцензією Microsoft | ✅ | — |
+| Гра за ніком | після входу з ліцензійним акаунтом | ✅ одразу |
+| Код входу Microsoft і Client ID | є | немає зовсім |
+
+Обидві ставлять Java, Minecraft, Fabric і моди сервера, оновлюються самі й можуть стояти поруч.
+
 ## Завантажити
 
 Останній реліз — на сторінці [Releases](../../releases/latest):
 
-| Система | Інсталятор |
-|---|---|
-| Windows 10/11 | `Altherra-Setup-windows-x64.exe` |
-| Linux (glibc і musl) | `Altherra-Setup-linux-x64.run` — запуск: `sh Altherra-Setup-linux-x64.run` |
-| macOS 11+ (Apple Silicon та Intel) | `Altherra-macos.zip` |
+| Система | Altherra | Altherra Offline |
+|---|---|---|
+| Windows 10/11 | `Altherra-Setup-windows-x64.exe` | `Altherra-Offline-Setup-windows-x64.exe` |
+| Linux (glibc і musl) | `Altherra-Setup-linux-x64.run` | `Altherra-Offline-Setup-linux-x64.run` |
+| macOS 11+ (Apple Silicon та Intel) | `Altherra-macos.zip` | `Altherra-Offline-macos.zip` |
+
+Інсталятор для Linux запускається так: `sh Altherra-Setup-linux-x64.run`.
 
 Встановлений лаунчер оновлюється сам: коли виходить нова версія, зверху зʼявляється кнопка «Оновити». Оновлення підписані ключем Ed25519, тож підмінений файл лаунчер не встановить.
 
 ## Збирання
 
 ```bash
-cargo build --release
+cargo build --release                        # Altherra
+cargo build --release --no-default-features  # Altherra Offline
 ```
 
 ---

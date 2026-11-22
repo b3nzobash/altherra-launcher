@@ -1,5 +1,6 @@
 ; Інсталятор лаунчера Altherra для Windows.
-; makensis /DVERSION=1.1.0 /DEXE=шлях\Altherra-windows-x64.exe /DOUT=Altherra-Setup-windows-x64.exe altherra.nsi
+; makensis /DVERSION=1.2.0 /DEXE=шлях\Altherra-windows-x64.exe /DOUT=Altherra-Setup-windows-x64.exe altherra.nsi
+; Offline-версія: /DAPP="Altherra Offline" /DEXE_BASE=AltherraOffline /DREG_ID=AltherraOfflineLauncher
 ; Ставиться для поточного користувача в %LOCALAPPDATA%\Programs\Altherra — без прав адміністратора,
 ; і лаунчер може сам оновлювати свій файл.
 
@@ -17,14 +18,22 @@ Unicode true
   !define OUT "Altherra-Setup-windows-x64.exe"
 !endif
 
-!define APP "Altherra"
-!define EXE_NAME "Altherra.exe"
-!define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\AltherraLauncher"
+!ifndef APP
+  !define APP "Altherra"
+!endif
+!ifndef EXE_BASE
+  !define EXE_BASE "Altherra"
+!endif
+!ifndef REG_ID
+  !define REG_ID "AltherraLauncher"
+!endif
+!define EXE_NAME "${EXE_BASE}.exe"
+!define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${REG_ID}"
 
 Name "${APP}"
 OutFile "${OUT}"
 InstallDir "$LOCALAPPDATA\Programs\${APP}"
-InstallDirRegKey HKCU "Software\${APP}" "InstallDir"
+InstallDirRegKey HKCU "Software\${REG_ID}" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "${APP} Launcher ${VERSION}"
@@ -59,7 +68,7 @@ Section "${APP}" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
   ; Старий файл після самооновлення лаунчера.
-  Delete "$INSTDIR\Altherra.old.exe"
+  Delete "$INSTDIR\${EXE_BASE}.old.exe"
   File "/oname=${EXE_NAME}" "${EXE}"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
@@ -67,7 +76,7 @@ Section "${APP}" SecMain
   CreateShortcut "$SMPROGRAMS\${APP}\${APP}.lnk" "$INSTDIR\${EXE_NAME}"
   CreateShortcut "$SMPROGRAMS\${APP}\Видалити ${APP}.lnk" "$INSTDIR\Uninstall.exe"
 
-  WriteRegStr HKCU "Software\${APP}" "InstallDir" "$INSTDIR"
+  WriteRegStr HKCU "Software\${REG_ID}" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "${UNINST_KEY}" "DisplayName" "${APP}"
   WriteRegStr HKCU "${UNINST_KEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr HKCU "${UNINST_KEY}" "Publisher" "${APP}"
@@ -93,7 +102,7 @@ SectionEnd
 
 Section "Uninstall"
   Delete "$INSTDIR\${EXE_NAME}"
-  Delete "$INSTDIR\Altherra.old.exe"
+  Delete "$INSTDIR\${EXE_BASE}.old.exe"
   Delete "$INSTDIR\.altherra-update.tmp"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
@@ -102,6 +111,6 @@ Section "Uninstall"
   RMDir "$SMPROGRAMS\${APP}"
   Delete "$DESKTOP\${APP}.lnk"
   DeleteRegKey HKCU "${UNINST_KEY}"
-  DeleteRegKey HKCU "Software\${APP}"
+  DeleteRegKey HKCU "Software\${REG_ID}"
   ; Світи, налаштування й акаунти (%APPDATA%\.altherra) не чіпаємо.
 SectionEnd

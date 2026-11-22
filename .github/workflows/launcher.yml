@@ -1,5 +1,7 @@
-# Збирає лаунчер під Windows, macOS і Linux (glibc та musl), робить інсталятори
+# Збирає дві версії лаунчера під Windows, macOS і Linux (glibc та musl), робить інсталятори
 # і на тег launcher-v* публікує підписаний реліз.
+#   Altherra          — офіційна: вхід з ліцензією Microsoft.
+#   Altherra Offline  — лише вхід за ніком (cargo --no-default-features).
 name: launcher
 
 on:
@@ -22,15 +24,22 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --release --locked
-      - run: cargo build --release --locked
-      - name: Інсталятор
+      - name: Збірки й інсталятори
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
+          cargo build --release --locked
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           Copy-Item target/release/altherra-launcher.exe dist/Altherra-windows-x64.exe
+          cargo build --release --locked --no-default-features
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Copy-Item target/release/altherra-launcher.exe dist/Altherra-Offline-windows-x64.exe
           if (-not (Test-Path "C:\Program Files (x86)\NSIS\makensis.exe")) { choco install nsis -y --no-progress }
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
-          & "C:\Program Files (x86)\NSIS\makensis.exe" /V2 "/DVERSION=$version" "/DEXE=$PWD\dist\Altherra-windows-x64.exe" "/DOUT=$PWD\dist\Altherra-Setup-windows-x64.exe" installer\windows\altherra.nsi
+          & $nsis /V2 "/DVERSION=$version" "/DEXE=$PWD\dist\Altherra-windows-x64.exe" "/DOUT=$PWD\dist\Altherra-Setup-windows-x64.exe" installer\windows\altherra.nsi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $nsis /V2 "/DVERSION=$version" "/DAPP=Altherra Offline" "/DEXE_BASE=AltherraOffline" "/DREG_ID=AltherraOfflineLauncher" "/DEXE=$PWD\dist\Altherra-Offline-windows-x64.exe" "/DOUT=$PWD\dist\Altherra-Offline-Setup-windows-x64.exe" installer\windows\altherra.nsi
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - uses: actions/upload-artifact@v4
         with: { name: windows, path: dist/* }
@@ -43,11 +52,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libwayland-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev
       - run: cargo test --release --locked
-      - run: cargo build --release --locked
-      - run: |
+      - name: Обидві збірки
+        run: |
           mkdir -p dist
+          cargo build --release --locked
           cp target/release/altherra-launcher dist/altherra-launcher-linux-x64-gnu
           tar czf dist/Altherra-linux-x64.tar.gz -C target/release altherra-launcher
+          cargo build --release --locked --no-default-features
+          cp target/release/altherra-launcher dist/altherra-offline-linux-x64-gnu
+          cp target/release/altherra-launcher /tmp/altherra-offline
+          tar czf dist/Altherra-Offline-linux-x64.tar.gz -C /tmp altherra-offline
       - uses: actions/upload-artifact@v4
         with: { name: linux-gnu, path: dist/* }
 
@@ -65,12 +79,16 @@ jobs:
             . "$HOME/.cargo/env"
             export RUSTFLAGS="-C target-feature=-crt-static"
             cargo test --release --locked
-            cargo build --release --locked
             mkdir -p dist
+            cargo build --release --locked
             cp target/release/altherra-launcher dist/altherra-launcher-linux-x64-musl
-            # Перевірка, що збірка справді запускається на musl.
-            ldd dist/altherra-launcher-linux-x64-musl | grep -q musl
-            ALTHERRA_HOME=/tmp/al ALTHERRA_API=https://127.0.0.1:1 ./dist/altherra-launcher-linux-x64-musl --cli 2>&1 | grep -q "Помилка"
+            cargo build --release --locked --no-default-features
+            cp target/release/altherra-launcher dist/altherra-offline-linux-x64-musl
+            # Перевірка, що збірки справді запускаються на musl.
+            for b in dist/*-musl; do
+              ldd "$b" | grep -q musl
+              ALTHERRA_HOME=/tmp/al ALTHERRA_API=https://127.0.0.1:1 "$b" --cli 2>&1 | grep -q "Помилка"
+            done
             chown -R '"$(id -u):$(id -g)"' dist target
           '
       - uses: actions/upload-artifact@v4
@@ -85,41 +103,50 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with: { targets: "aarch64-apple-darwin,x86_64-apple-darwin" }
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked --target aarch64-apple-darwin
-      - run: cargo build --release --locked --target x86_64-apple-darwin
-      - name: Altherra.app (universal)
+      - name: Обидві збірки (.app, Apple Silicon + Intel)
         run: |
-          APP=dist/Altherra.app
-          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-          lipo -create -output "$APP/Contents/MacOS/altherra-launcher" \
-            target/aarch64-apple-darwin/release/altherra-launcher \
-            target/x86_64-apple-darwin/release/altherra-launcher
+          mkdir -p dist
           ICONSET=$(mktemp -d)/AppIcon.iconset && mkdir -p "$ICONSET"
           for s in 16 32 128 256 512; do
             sips -z $s $s assets/icon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
             sips -z $((s*2)) $((s*2)) assets/icon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
           done
-          iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+          iconutil -c icns "$ICONSET" -o /tmp/AppIcon.icns
           VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          cat > "$APP/Contents/Info.plist" <<EOF
+
+          # bundle <назва> <bundle id> <zip> [прапорці cargo]
+          bundle() {
+            NAME=$1; BID=$2; ZIP=$3; shift 3
+            cargo build --release --locked --target aarch64-apple-darwin "$@"
+            cargo build --release --locked --target x86_64-apple-darwin "$@"
+            APP="dist/$NAME.app"
+            mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+            lipo -create -output "$APP/Contents/MacOS/altherra-launcher" \
+              target/aarch64-apple-darwin/release/altherra-launcher \
+              target/x86_64-apple-darwin/release/altherra-launcher
+            cp /tmp/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+            cat > "$APP/Contents/Info.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
-            <key>CFBundleName</key><string>Altherra</string>
-            <key>CFBundleDisplayName</key><string>Altherra</string>
-            <key>CFBundleIdentifier</key><string>ua.com.altherra.launcher</string>
+            <key>CFBundleName</key><string>$NAME</string>
+            <key>CFBundleDisplayName</key><string>$NAME</string>
+            <key>CFBundleIdentifier</key><string>$BID</string>
             <key>CFBundleExecutable</key><string>altherra-launcher</string>
             <key>CFBundleIconFile</key><string>AppIcon</string>
             <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>${VERSION}</string>
-            <key>CFBundleVersion</key><string>${VERSION}</string>
+            <key>CFBundleShortVersionString</key><string>$VERSION</string>
+            <key>CFBundleVersion</key><string>$VERSION</string>
             <key>LSMinimumSystemVersion</key><string>11.0</string>
             <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
             <key>NSHighResolutionCapable</key><true/>
           </dict></plist>
           EOF
-          codesign --force --deep --sign - "$APP"
-          cd dist && ditto -c -k --keepParent Altherra.app Altherra-macos.zip && rm -rf Altherra.app
+            codesign --force --deep --sign - "$APP"
+            (cd dist && ditto -c -k --keepParent "$NAME.app" "$ZIP" && rm -rf "$NAME.app")
+          }
+          bundle "Altherra" ua.com.altherra.launcher Altherra-macos.zip
+          bundle "Altherra Offline" ua.com.altherra.offline Altherra-Offline-macos.zip --no-default-features
       - uses: actions/upload-artifact@v4
         with: { name: macos, path: dist/* }
 
@@ -131,8 +158,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { path: dist, merge-multiple: true }
-      - name: Інсталятор для Linux
-        run: sh installer/linux/build.sh dist/altherra-launcher-linux-x64-gnu dist/altherra-launcher-linux-x64-musl assets/icon.png dist/Altherra-Setup-linux-x64.run
+      - name: Інсталятори для Linux
+        run: |
+          sh installer/linux/build.sh "Altherra" altherra-launcher dist/altherra-launcher-linux-x64-gnu dist/altherra-launcher-linux-x64-musl assets/icon.png dist/Altherra-Setup-linux-x64.run
+          sh installer/linux/build.sh "Altherra Offline" altherra-offline dist/altherra-offline-linux-x64-gnu dist/altherra-offline-linux-x64-musl assets/icon.png dist/Altherra-Offline-Setup-linux-x64.run
       - name: Контрольні суми й підпис
         env:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
@@ -150,11 +179,14 @@ jobs:
           name: Altherra Launcher ${{ github.ref_name }}
           files: dist/*
           body: |
-            **Встановити:**
+            ### Altherra — з ліцензією Microsoft
             - Windows 10/11 — `Altherra-Setup-windows-x64.exe`
-            - Linux (glibc і musl) — `Altherra-Setup-linux-x64.run`, запуск: `sh Altherra-Setup-linux-x64.run`
-            - macOS 11+ (Apple Silicon та Intel) — `Altherra-macos.zip`
+            - Linux (glibc і musl) — `Altherra-Setup-linux-x64.run` (`sh Altherra-Setup-linux-x64.run`)
+            - macOS 11+ — `Altherra-macos.zip`
 
-            Без встановлення: `Altherra-windows-x64.exe`, `Altherra-linux-x64.tar.gz`.
+            ### Altherra Offline — лише вхід за ніком
+            - Windows 10/11 — `Altherra-Offline-Setup-windows-x64.exe`
+            - Linux (glibc і musl) — `Altherra-Offline-Setup-linux-x64.run`
+            - macOS 11+ — `Altherra-Offline-macos.zip`
 
-            Уже встановлений лаунчер оновиться сам — кнопка «Оновити» зверху.
+            Встановлений лаунчер оновлюється сам — кнопка «Оновити» зверху.

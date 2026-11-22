@@ -67,6 +67,16 @@ fn main() {
     shot(&win, w, h, &format!("{out}/ui-ms-code.png"));
     ui.set_accounts_open(false);
     ui.set_ms_waiting(false);
+    // Офіційна збірка без ліцензійного акаунта і Altherra Offline.
+    ui.set_accounts(ModelRc::new(VecModel::from(Vec::<AccountItem>::new())));
+    ui.set_offline_allowed(false);
+    ui.set_accounts_open(true);
+    shot(&win, w, h, &format!("{out}/ui-official-locked.png"));
+    ui.set_edition_official(false);
+    ui.set_offline_allowed(true);
+    shot(&win, w, h, &format!("{out}/ui-offline-accounts.png"));
+    ui.set_accounts_open(false);
+    ui.set_edition_official(true);
     for (i, name) in [(1, "build"), (2, "settings"), (3, "log")] {
         ui.set_page(i);
         shot(&win, w, h, &format!("{out}/ui-{name}.png"));

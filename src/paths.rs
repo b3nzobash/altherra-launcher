@@ -43,7 +43,8 @@ pub fn settings_file() -> PathBuf {
     root().join("settings.json")
 }
 pub fn accounts_file() -> PathBuf {
-    root().join("accounts.json")
+    // Offline-версія тримає акаунти окремо, щоб не чіпати ліцензійні акаунти офіційної.
+    root().join(if crate::OFFICIAL { "accounts.json" } else { "accounts-offline.json" })
 }
 pub fn manifest_cache() -> PathBuf {
     root().join("manifest.json")

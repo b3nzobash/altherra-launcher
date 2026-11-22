@@ -1,4 +1,5 @@
 //! Акаунти: ліцензія через Microsoft (вхід за кодом пристрою) і гра без ліцензії.
+#![cfg_attr(not(feature = "microsoft"), allow(dead_code))]
 use crate::net;
 use crate::paths;
 use anyhow::{Context, Result, anyhow, bail};
