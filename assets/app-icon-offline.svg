@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Altherra Offline"><title>Altherra Offline</title><defs>
+  <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a0e13"/><stop offset="1" stop-color="#160709"/></linearGradient>
+  <linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb3a6"/><stop offset="1" stop-color="#ff3b4f"/></linearGradient>
+  <linearGradient id="l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6b5b"/><stop offset="1" stop-color="#a3121f"/></linearGradient>
+  <linearGradient id="p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1ee"/><stop offset="1" stop-color="#ff9a88"/></linearGradient></defs><rect x="24" y="24" width="976" height="976" rx="216" fill="url(#tile)"/><rect x="27" y="27" width="970" height="970" rx="213" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="6"/><g transform="translate(0 70)"><path d="M452 170H572L812 700H690Z" fill="url(#r)"/><path d="M452 170L512 302L334 700H212Z" fill="url(#l)"/><path d="M512 470L612 700H412Z" fill="url(#p)"/></g></svg>

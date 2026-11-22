@@ -506,6 +506,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
     ui.set_version(env!("CARGO_PKG_VERSION").into());
     ui.set_edition_official(OFFICIAL);
+    ui.global::<Theme>().set_offline(!OFFICIAL);
     ui.set_game_dir(paths::game_dir().to_string_lossy().into_owned().into());
     {
         let st = state.lock().unwrap();

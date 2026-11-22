@@ -45,8 +45,11 @@ VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "LegalCopyright" "${APP}"
 
-!define MUI_ICON "..\..\assets\icon.ico"
-!define MUI_UNICON "..\..\assets\icon.ico"
+!ifndef ICON
+  !define ICON "icon.ico"
+!endif
+!define MUI_ICON "..\..\assets\${ICON}"
+!define MUI_UNICON "..\..\assets\${ICON}"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Встановлення ${APP}"
 !define MUI_WELCOMEPAGE_TEXT "Лаунчер сам поставить Java, Minecraft, Fabric і моди сервера.$\r$\n$\r$\nПрава адміністратора не потрібні."

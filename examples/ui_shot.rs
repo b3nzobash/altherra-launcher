@@ -73,9 +73,15 @@ fn main() {
     ui.set_accounts_open(true);
     shot(&win, w, h, &format!("{out}/ui-official-locked.png"));
     ui.set_edition_official(false);
+    ui.global::<Theme>().set_offline(true);
     ui.set_offline_allowed(true);
     shot(&win, w, h, &format!("{out}/ui-offline-accounts.png"));
     ui.set_accounts_open(false);
+    shot(&win, w, h, &format!("{out}/ui-offline-home.png"));
+    ui.set_page(2);
+    shot(&win, w, h, &format!("{out}/ui-offline-settings.png"));
+    ui.set_page(0);
+    ui.global::<Theme>().set_offline(false);
     ui.set_edition_official(true);
     for (i, name) in [(1, "build"), (2, "settings"), (3, "log")] {
         ui.set_page(i);

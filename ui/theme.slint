@@ -6,21 +6,24 @@ import "fonts/Manrope-Bold.ttf";
 import "fonts/JetBrainsMono-Medium.ttf";
 
 export global Theme {
-    out property <color> bg: #05070d;
-    out property <color> bg2: #0a0f1c;
-    out property <color> surface: #10182aa0;
-    out property <color> surface-solid: #0c1322;
-    out property <color> line: #78beff24;
-    out property <color> line-strong: #78dcff59;
-    out property <color> text: #e6edf7;
-    out property <color> muted: #8a97ad;
-    out property <color> cyan: #3cf2ff;
-    out property <color> violet: #9b6bff;
-    out property <color> pink: #ff4fd8;
+    // Altherra Offline — у червоних тонах, як її логотип.
+    in property <bool> offline: false;
+    out property <color> bg: offline ? #0b0506 : #05070d;
+    out property <color> bg2: offline ? #170a0c : #0a0f1c;
+    out property <color> surface: offline ? #2a1014a0 : #10182aa0;
+    out property <color> surface-solid: offline ? #1f0c0f : #0c1322;
+    out property <color> line: offline ? #ff8c8c24 : #78beff24;
+    out property <color> line-strong: offline ? #ff9a9a59 : #78dcff59;
+    out property <color> text: offline ? #f7e9e9 : #e6edf7;
+    out property <color> muted: offline ? #b09597 : #8a97ad;
+    // «cyan» і «violet» — основний і другий колір теми.
+    out property <color> cyan: offline ? #ff4d5e : #3cf2ff;
+    out property <color> violet: offline ? #ff8a3d : #9b6bff;
+    out property <color> pink: offline ? #ffcc4d : #ff4fd8;
     out property <color> green: #4dffa6;
     out property <color> amber: #ffc24d;
     out property <color> red: #ff5c7a;
-    out property <brush> accent: @linear-gradient(100deg, #3cf2ff 0%, #9b6bff 100%);
+    out property <brush> accent: offline ? @linear-gradient(100deg, #ff4d5e 0%, #ff8a3d 100%) : @linear-gradient(100deg, #3cf2ff 0%, #9b6bff 100%);
     out property <string> display: "Unbounded";
     out property <string> body: "Manrope";
     out property <string> mono: "JetBrains Mono";
@@ -48,7 +51,7 @@ export component Button inherits Rectangle {
     border-color: root.danger && ta.has-hover ? Theme.red : (ta.has-hover && root.enabled ? Theme.violet : Theme.line-strong);
     opacity: root.enabled ? 1 : 0.45;
     drop-shadow-blur: root.primary && root.enabled ? (ta.has-hover ? 30px : 20px) : 0;
-    drop-shadow-color: root.primary && root.enabled ? #3cf2ff55 : transparent;
+    drop-shadow-color: root.primary && root.enabled ? Theme.cyan.with-alpha(0.33) : transparent;
     drop-shadow-offset-y: root.primary && root.enabled ? 6px : 0;
     animate drop-shadow-blur, background { duration: 150ms; }
     label := Text {
@@ -77,7 +80,7 @@ export component Field inherits Rectangle {
     callback edited(string);
     height: 42px;
     border-radius: 11px;
-    background: #03050abf;
+    background: Theme.bg.with-alpha(0.75);
     border-width: 1px;
     border-color: input.has-focus ? Theme.cyan : Theme.line-strong;
     opacity: root.enabled ? 1 : 0.5;
@@ -86,7 +89,7 @@ export component Field inherits Rectangle {
         x: 13px;
         text: root.placeholder;
         visible: input.text == "";
-        color: #8a97ad99;
+        color: Theme.muted.with-alpha(0.6);
         font-family: root.mono ? Theme.mono : Theme.body;
         font-size: 14px;
         vertical-alignment: center;
@@ -103,7 +106,7 @@ export component Field inherits Rectangle {
         font-size: 14px;
         vertical-alignment: center;
         single-line: true;
-        selection-background-color: #3cf2ff55;
+        selection-background-color: Theme.cyan.with-alpha(0.33);
         accepted => { root.accepted(self.text); }
         edited => { root.edited(self.text); }
     }
@@ -165,7 +168,7 @@ export component Slider inherits Rectangle {
         border-radius: 10px;
         background: white;
         drop-shadow-blur: 12px;
-        drop-shadow-color: #3cf2ff88;
+        drop-shadow-color: Theme.cyan.with-alpha(0.53);
     }
     ta := TouchArea {
         mouse-cursor: pointer;
@@ -189,7 +192,7 @@ export component Segmented inherits Rectangle {
     callback changed(int);
     height: 40px;
     border-radius: 12px;
-    background: #03050abf;
+    background: Theme.bg.with-alpha(0.75);
     border-width: 1px;
     border-color: Theme.line-strong;
     HorizontalLayout {
@@ -197,7 +200,7 @@ export component Segmented inherits Rectangle {
         spacing: 4px;
         for opt[i] in root.options: Rectangle {
             border-radius: 9px;
-            background: i == root.current ? @linear-gradient(100deg, #3cf2ff33 0%, #9b6bff40 100%) : (sta.has-hover ? #ffffff0d : transparent);
+            background: i == root.current ? @linear-gradient(100deg, Theme.cyan.with-alpha(0.2) 0%, Theme.violet.with-alpha(0.25) 100%) : (sta.has-hover ? #ffffff0d : transparent);
             Text {
                 text: opt;
                 color: i == root.current ? Theme.text : Theme.muted;
@@ -228,7 +231,7 @@ export component Avatar inherits Rectangle {
     height: root.size;
     border-radius: root.size * 0.24;
     clip: true;
-    background: @linear-gradient(140deg, #3cf2ff40 0%, #9b6bff55 100%);
+    background: @linear-gradient(140deg, Theme.cyan.with-alpha(0.25) 0%, Theme.violet.with-alpha(0.33) 100%);
     if root.has-face: Image {
         width: parent.width;
         height: parent.height;
