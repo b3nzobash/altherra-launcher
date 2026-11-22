@@ -187,7 +187,7 @@ pub fn spawn(p: &Prepared, m: &Manifest, s: &Settings, acc: &Account, on_line: i
         ("classpath", cp),
         ("classpath_separator", sep.to_owned()),
         ("library_directory", paths::libraries().to_string_lossy().into_owned()),
-        ("quickPlayMultiplayer", server_arg),
+        ("quickPlayMultiplayer", server_arg.clone()),
         ("resolution_width", s.width.to_string()),
         ("resolution_height", s.height.to_string()),
     ]);
@@ -198,6 +198,10 @@ pub fn spawn(p: &Prepared, m: &Manifest, s: &Settings, acc: &Account, on_line: i
     ]);
 
     let mut args = vec![format!("-Xmx{ram}M"), format!("-Xms{}M", (ram / 2).min(2048))];
+    // Адреса сервера для мода Altherra Client (перепідключення після кіку).
+    if !server.is_empty() {
+        args.push(format!("-Daltherra.server={server_arg}"));
+    }
     args.extend(split_args(&m.jvm_args).into_iter().filter(|a| server_arg_allowed(a)));
     args.extend(split_args(&s.jvm_args));
     expand(p.profile.json.get("arguments").and_then(|a| a.get("jvm")), &vars, &features, &mut args);
