@@ -1,6 +1,8 @@
 package ua.altherra.client;
 
+import io.netty.buffer.Unpooled;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientLoginNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
@@ -14,15 +16,18 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Altherra Client:
  *  - після кіку чи обриву звʼязку гра сама перепідключається до сервера (з відліком і кнопкою «Скасувати»), скільки б разів це не знадобилося;
- *  - кнопка «Відʼєднатися» в меню паузи стає «Вийти з гри» і закриває Minecraft.
+ *  - кнопка «Відʼєднатися» в меню паузи стає «Вийти з гри» і закриває Minecraft;
+ *  - під час входу відповідає серверу Altherra списком своїх модів (див. {@link ModList}).
  * Сервер береться з -Daltherra.server=host:port (його передає лаунчер) або з останнього, до якого гравець заходив.
  */
 public final class AltherraClient implements ClientModInitializer {
@@ -32,6 +37,8 @@ public final class AltherraClient implements ClientModInitializer {
 	private static ServerData lastServer;
 	private static int attempt = 0;
 	private static boolean cancelled = false;
+	/** Сервер спитав моди, а у світ ми ще не зайшли: якщо зараз відʼєднає — це відмова через моди, і перепідключення не допоможе. */
+	private static boolean modCheckPending = false;
 
 	@Override
 	public void onInitializeClient() {
@@ -39,6 +46,13 @@ public final class AltherraClient implements ClientModInitializer {
 		if (!fromLauncher.isEmpty()) {
 			lastServer = new ServerData("Altherra", fromLauncher, ServerData.Type.OTHER);
 		}
+
+		ClientLoginNetworking.registerGlobalReceiver(ModList.CHANNEL, (client, handler, buf, listenerAdder) -> {
+			modCheckPending = true;
+			FriendlyByteBuf out = new FriendlyByteBuf(Unpooled.buffer());
+			ModList.write(out);
+			return CompletableFuture.completedFuture(out);
+		});
 
 		// Успішно зайшли — запамʼятовуємо сервер і скидаємо лічильник спроб.
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
@@ -48,6 +62,7 @@ public final class AltherraClient implements ClientModInitializer {
 			}
 			attempt = 0;
 			cancelled = false;
+			modCheckPending = false;
 		});
 
 		ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
@@ -61,6 +76,14 @@ public final class AltherraClient implements ClientModInitializer {
 
 	/** Екран «Втрачено зʼєднання»: відлік і автоматичне перепідключення. */
 	private static void onDisconnected(Minecraft client, Screen screen, int width, int height) {
+		if (modCheckPending) {
+			// Сервер не пустив через моди: лаунчер має оновити збірку, тож замість перепідключення — підказка.
+			modCheckPending = false;
+			Button hint = Button.builder(Component.literal("Закрий гру й натисни «Грати» в лаунчері"), b -> client.stop())
+					.bounds(width / 2 - 100, height - 52, 200, 20).build();
+			Screens.getWidgets(screen).add(hint);
+			return;
+		}
 		if (lastServer == null || cancelled) {
 			return;
 		}
