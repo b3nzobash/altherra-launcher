@@ -35,15 +35,15 @@ component NavButton inherits Rectangle {
     callback clicked;
     width: 80px;
     height: 60px;
-    border-radius: 14px;
-    background: root.active ? Theme.cyan.with-alpha(0.12) : (ta.has-hover ? #ffffff0a : transparent);
+    border-radius: 0px;
+    background: root.active ? Theme.line : (ta.has-hover ? #ffffff08 : transparent);
     animate background { duration: 120ms; }
     Rectangle {
         x: 0;
         y: 16px;
         width: 3px;
         height: parent.height - 32px;
-        border-radius: 2px;
+        border-radius: 0px;
         background: Theme.cyan;
         visible: root.active;
     }
@@ -73,25 +73,6 @@ component NavButton inherits Rectangle {
     }
 }
 
-component Chip inherits Rectangle {
-    in property <string> text;
-    in property <color> fg: Theme.muted;
-    height: 30px;
-    width: t.preferred-width + 24px;
-    border-radius: 15px;
-    background: Theme.surface;
-    border-width: 1px;
-    border-color: Theme.line;
-    t := Text {
-        text: root.text;
-        color: root.fg;
-        font-family: Theme.mono;
-        font-size: 12px;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-}
-
 component SectionTitle inherits Text {
     font-family: Theme.display;
     font-weight: 800;
@@ -102,16 +83,16 @@ component SectionTitle inherits Text {
 component NewsCard inherits Rectangle {
     in property <NewsItem> item;
     callback open(string);
-    border-radius: 16px;
+    border-radius: 0px;
     background: ta.has-hover ? Theme.surface-solid.with-alpha(0.5) : Theme.surface;
-    border-width: 1px;
+    border-width: 2px;
     border-color: ta.has-hover ? Theme.line-strong : Theme.line;
     clip: true;
     animate background, border-color { duration: 150ms; }
     VerticalLayout {
         Rectangle {
             height: root.width * 0.45;
-            background: @linear-gradient(140deg, Theme.cyan.with-alpha(0.15) 0%, Theme.violet.with-alpha(0.2) 100%);
+            background: Theme.line;
             if root.item.has-cover: Image {
                 width: parent.width;
                 height: parent.height;
@@ -341,45 +322,30 @@ export component AppWindow inherits Window {
                         spacing: 10px;
                         alignment: start;
                         Rectangle {
-                            height: 30px;
-                            width: st.preferred-width + 40px;
-                            border-radius: 15px;
-                            background: Theme.surface;
-                            border-width: 1px;
-                            border-color: root.server-state == 1 ? Theme.green.with-alpha(0.33) : Theme.line;
-                            dot := Rectangle {
-                                x: 13px;
-                                width: 9px;
-                                height: 9px;
-                                border-radius: 5px;
-                                background: root.server-state == 1 ? Theme.green : (root.server-state == 2 ? Theme.red : Theme.muted);
-                                drop-shadow-blur: root.server-state == 1 ? 8px : 0;
-                                drop-shadow-color: Theme.green;
-                            }
-                            st := Text {
-                                x: 30px;
-                                text: root.server-status;
-                                color: root.server-state == 1 ? Theme.green : Theme.muted;
-                                font-family: Theme.mono;
-                                font-size: 12px;
-                                vertical-alignment: center;
-                                height: parent.height;
-                            }
+                            width: 8px;
+                            height: 8px;
+                            y: (parent.height - 8px) / 2;
+                            border-radius: 0px;
+                            background: root.server-state == 1 ? Theme.green : (root.server-state == 2 ? Theme.red : Theme.muted);
                         }
-                        if root.mc-version != "": Chip { text: "Minecraft " + root.mc-version; }
-                        if root.loader-text != "": Chip { text: root.loader-text; }
-                        if root.mods-count > 0: Chip { text: root.mods-count + " модів"; }
+                        st := Text {
+                            text: root.server-status
+                                + (root.mc-version != "" ? "   ·   Minecraft " + root.mc-version : "")
+                                + (root.loader-text != "" ? "   ·   " + root.loader-text : "")
+                                + (root.mods-count > 0 ? "   ·   модів: " + root.mods-count : "");
+                            color: Theme.muted;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
                         Rectangle { horizontal-stretch: 1; }
                         if root.update-version != "": Rectangle {
                             height: 30px;
-                            width: up-t.preferred-width + 28px;
-                            border-radius: 15px;
-                            background: up-ta.has-hover && !root.update-busy ? Theme.accent : Theme.cyan.with-alpha(0.12);
-                            border-width: 1px;
-                            border-color: Theme.cyan.with-alpha(0.4);
+                            width: up-t.preferred-width + 24px;
+                            border-radius: 0px;
+                            background: up-ta.has-hover && !root.update-busy ? Theme.line-strong : Theme.line;
                             up-t := Text {
-                                text: root.update-busy ? "Оновлюємо…" : "Нова версія " + root.update-version + " · Оновити";
-                                color: up-ta.has-hover && !root.update-busy ? #04060b : Theme.cyan;
+                                text: root.update-busy ? "Оновлюємо…" : "Вийшла версія " + root.update-version + " — оновити";
+                                color: Theme.text;
                                 font-weight: 700;
                                 font-size: 12px;
                                 horizontal-alignment: center;
@@ -395,12 +361,11 @@ export component AppWindow inherits Window {
 
                     Rectangle { height: 26px; }
                     Text {
-                        text: "ALTHERRA";
+                        text: root.edition-official ? "Altherra" : "Altherra Offline";
                         font-family: Theme.display;
                         font-weight: 800;
-                        font-size: 76px;
-                        letter-spacing: 6px;
-                        color: @linear-gradient(100deg, #ffffff 10%, Theme.cyan 45%, Theme.violet 75%, Theme.pink 100%);
+                        font-size: 54px;
+                        color: Theme.text;
                     }
                     Text {
                         text: root.tagline;
@@ -450,9 +415,9 @@ export component AppWindow inherits Window {
 
                     if root.manifest-offline || root.manifest-error != "": Rectangle {
                         height: 44px;
-                        border-radius: 12px;
+                        border-radius: 0px;
                         background: #ffc24d12;
-                        border-width: 1px;
+                        border-width: 2px;
                         border-color: #ffc24d59;
                         Text {
                             x: 16px;
@@ -523,7 +488,7 @@ export component AppWindow inherits Window {
                                         width: 34px;
                                         height: 34px;
                                         y: 9px;
-                                        border-radius: 9px;
+                                        border-radius: 0px;
                                         background: Theme.cyan.with-alpha(0.08);
                                         Text {
                                             text: f.dir == "mods" ? "M" : f.dir == "resourcepacks" ? "R" : f.dir == "shaderpacks" ? "S" : "C";
@@ -585,7 +550,7 @@ export component AppWindow inherits Window {
                                             y: 16px;
                                             width: 70px;
                                             height: 32px;
-                                            border-radius: 16px;
+                                            border-radius: 0px;
                                             background: Theme.cyan.with-alpha(0.1);
                                             Text { text: round(root.ram-gb) + " ГБ"; color: Theme.cyan; font-family: Theme.mono; font-size: 13px; }
                                         }
@@ -707,9 +672,9 @@ export component AppWindow inherits Window {
                         y: 18px;
                         height: 60px;
                         width: 250px;
-                        border-radius: 14px;
+                        border-radius: 0px;
                         background: acc-ta.has-hover ? #ffffff0d : Theme.surface;
-                        border-width: 1px;
+                        border-width: 2px;
                         border-color: acc-ta.has-hover ? Theme.line-strong : Theme.line;
                         HorizontalLayout {
                             padding: 10px;
@@ -760,13 +725,13 @@ export component AppWindow inherits Window {
                         }
                         if root.busy: Rectangle {
                             height: 6px;
-                            border-radius: 3px;
+                            border-radius: 0px;
                             background: #ffffff14;
                             Rectangle {
                                 x: 0;
                                 width: parent.width * clamp(root.progress, 0, 1);
                                 height: parent.height;
-                                border-radius: 3px;
+                                border-radius: 0px;
                                 background: Theme.accent;
                                 animate width { duration: 200ms; }
                             }
@@ -778,20 +743,26 @@ export component AppWindow inherits Window {
                         y: 16px;
                         width: 230px;
                         height: 64px;
-                        border-radius: 16px;
+                        border-radius: 0px;
+                        clip: true;
                         property <bool> can-play: !root.busy && !root.game-running && root.has-account;
-                        background: self.can-play ? Theme.accent : (root.game-running ? Theme.green.with-alpha(0.12) : #ffffff14);
-                        drop-shadow-blur: self.can-play ? (play-ta.has-hover ? 46px : 30px) : 0;
-                        drop-shadow-color: self.can-play ? Theme.cyan.with-alpha(0.47) : transparent;
-                        drop-shadow-offset-y: self.can-play ? 8px : 0;
-                        animate drop-shadow-blur { duration: 180ms; }
+                        background: self.can-play ? (play-ta.pressed ? Theme.violet : (play-ta.has-hover ? Theme.pink.mix(Theme.cyan, 0.25) : Theme.cyan)) : (root.game-running ? Theme.green.with-alpha(0.12) : Theme.line);
+                        animate background { duration: 90ms; }
+                        // Темніша смуга знизу — як у кнопок самої гри.
+                        Rectangle {
+                            y: parent.height - 5px;
+                            height: 5px;
+                            background: parent.can-play && !play-ta.pressed ? Theme.violet : transparent;
+                        }
                         Text {
-                            text: root.game-running ? "ГРА ЗАПУЩЕНА" : (root.busy ? round(root.progress * 100) + "%" : "ГРАТИ");
+                            y: play-ta.pressed ? 2px : 0px;
+                            height: parent.height - 4px;
+                            text: root.game-running ? "Гра запущена" : (root.busy ? round(root.progress * 100) + "%" : "Грати");
                             font-family: Theme.display;
                             font-weight: 800;
-                            font-size: root.game-running ? 15px : 22px;
-                            letter-spacing: 2px;
-                            color: parent.can-play ? #04060b : (root.game-running ? Theme.green : Theme.muted);
+                            font-size: root.game-running ? 16px : 22px;
+                            color: parent.can-play ? Theme.on-accent : (root.game-running ? Theme.green : Theme.muted);
+                            vertical-alignment: center;
                         }
                         play-ta := TouchArea {
                             enabled: parent.can-play;
@@ -815,12 +786,10 @@ export component AppWindow inherits Window {
         Rectangle {
             width: 460px;
             height: box.preferred-height;
-            border-radius: 22px;
+            border-radius: 0px;
             background: Theme.bg2;
-            border-width: 1px;
+            border-width: 2px;
             border-color: Theme.line-strong;
-            drop-shadow-blur: 60px;
-            drop-shadow-color: Theme.cyan.with-alpha(0.19);
             TouchArea { }
             box := VerticalLayout {
                 padding: 26px;
@@ -831,8 +800,8 @@ export component AppWindow inherits Window {
                     Rectangle {
                         width: 34px;
                         height: 34px;
-                        border-radius: 10px;
-                        border-width: 1px;
+                        border-radius: 0px;
+                        border-width: 2px;
                         border-color: Theme.line-strong;
                         Text { text: "×"; font-size: 20px; color: Theme.text; }
                         TouchArea {
@@ -847,9 +816,9 @@ export component AppWindow inherits Window {
 
                 for a in root.accounts: Rectangle {
                     height: 58px;
-                    border-radius: 14px;
+                    border-radius: 0px;
                     background: a.selected ? Theme.cyan.with-alpha(0.08) : (row-ta.has-hover ? #ffffff0a : transparent);
-                    border-width: 1px;
+                    border-width: 2px;
                     border-color: a.selected ? Theme.cyan.with-alpha(0.35) : Theme.line;
                     row-ta := TouchArea {
                         mouse-cursor: pointer;
@@ -868,7 +837,7 @@ export component AppWindow inherits Window {
                         }
                         Rectangle {
                             width: 34px;
-                            border-radius: 9px;
+                            border-radius: 0px;
                             background: del-ta.has-hover ? #ff5c7a1f : transparent;
                             Text { text: "✕"; color: del-ta.has-hover ? Theme.red : Theme.muted; }
                             del-ta := TouchArea {
@@ -889,9 +858,9 @@ export component AppWindow inherits Window {
                     clicked => { root.ms-login(); }
                 }
                 if root.edition-official && root.ms-waiting: Rectangle {
-                    border-radius: 16px;
+                    border-radius: 0px;
                     background: Theme.cyan.with-alpha(0.05);
-                    border-width: 1px;
+                    border-width: 2px;
                     border-color: Theme.cyan.with-alpha(0.25);
                     height: ms-box.preferred-height;
                     ms-box := VerticalLayout {
@@ -958,9 +927,9 @@ export component AppWindow inherits Window {
         x: (parent.width - self.width) / 2;
         width: min(toast-t.preferred-width + 40px, parent.width - 80px);
         height: toast-t.preferred-height + 24px;
-        border-radius: 12px;
+        border-radius: 0px;
         background: Theme.surface-solid.with-alpha(0.95);
-        border-width: 1px;
+        border-width: 2px;
         border-color: Theme.red;
         toast-t := Text {
             width: parent.width - 40px;
