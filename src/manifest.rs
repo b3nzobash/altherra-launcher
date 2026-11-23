@@ -53,6 +53,34 @@ pub struct FileEntry {
 
 const DIRS: [&str; 4] = ["mods", "resourcepacks", "shaderpacks", "config"];
 
+/// Відбиток збірки: SHA-1 від відсортованих рядків «тека/файл:sha1» усіх файлів маніфесту.
+/// Гра повідомляє його серверу під час входу, а сервер рахує так само зі свого маніфесту:
+/// якщо відбитки різні — гравець грає зі старою збіркою (моди, текстури, шейдери чи конфіги).
+pub fn fingerprint(files: &[FileEntry]) -> String {
+    use sha1::{Digest, Sha1};
+    let mut lines: Vec<String> = files.iter().map(|f| format!("{}/{}:{}", f.dir, f.filename, f.sha1.to_ascii_lowercase())).collect();
+    lines.sort();
+    hex::encode(Sha1::digest(lines.join("\n").as_bytes()))
+}
+
+#[cfg(test)]
+mod fingerprint_tests {
+    use super::*;
+    /// sha1("mods/a.jar:aa") — те саме значення має порахувати сервер (Java).
+    const FP_A: &str = "546ae3f6237f7d2814bcd9f8e8968ac6b5972e4d";
+    fn f(dir: &str, name: &str, sha: &str) -> FileEntry {
+        FileEntry { name: name.into(), dir: dir.into(), filename: name.into(), sha1: sha.into(), size: 1, url: String::new(), fallback: None }
+    }
+    #[test]
+    fn order_does_not_matter_but_content_does() {
+        let a = fingerprint(&[f("mods", "a.jar", "AA"), f("config", "b.json", "bb")]);
+        let b = fingerprint(&[f("config", "b.json", "bb"), f("mods", "a.jar", "aa")]);
+        assert_eq!(a, b);
+        assert_ne!(a, fingerprint(&[f("mods", "a.jar", "aa"), f("config", "b.json", "cc")]));
+        assert_eq!(fingerprint(&[f("mods", "a.jar", "aa")]), FP_A);
+    }
+}
+
 /// Свіжий маніфест; якщо сервер недоступний — останній збережений.
 pub async fn fetch() -> Result<(Manifest, bool)> {
     let api = api_url();
