@@ -207,6 +207,8 @@ pub fn spawn(p: &Prepared, m: &Manifest, s: &Settings, acc: &Account, on_line: i
     // Куди моду покласти прохання перезапустити гру з оновленою збіркою.
     let _ = std::fs::remove_file(paths::relaunch_flag());
     args.push(format!("-Daltherra.relaunch={}", paths::relaunch_flag().display()));
+    // Відбиток збірки, з якою запущено гру: сервер порівнює його з поточним і попереджає про оновлення.
+    args.push(format!("-Daltherra.build={}", crate::manifest::fingerprint(&m.files)));
     args.extend(split_args(&m.jvm_args).into_iter().filter(|a| server_arg_allowed(a)));
     args.extend(split_args(&s.jvm_args));
     expand(p.profile.json.get("arguments").and_then(|a| a.get("jvm")), &vars, &features, &mut args);

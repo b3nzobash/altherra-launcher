@@ -40,6 +40,8 @@ final class ModList {
 			out.writeUtf(cut(e.filename(), 256), 256);
 			out.writeUtf(e.sha1(), 64);
 		}
+		// Відбиток збірки від лаунчера (моди, текстури, шейдери, конфіги). Старий сервер цього поля не читає.
+		out.writeUtf(System.getProperty("altherra.build", ""), 64);
 	}
 
 	private static synchronized List<Entry> list() {
