@@ -6,6 +6,7 @@ mod launch;
 mod manifest;
 mod mojang;
 mod net;
+mod packs;
 mod paths;
 mod ping;
 mod required;
