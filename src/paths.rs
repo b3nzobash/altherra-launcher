@@ -39,6 +39,11 @@ pub fn runtime() -> PathBuf {
 pub fn natives(version: &str) -> PathBuf {
     root().join("natives").join(version)
 }
+/// Його лишає мод Altherra Client перед виходом, коли гравець натиснув «Перезапустити гру»:
+/// лаунчер після закриття гри оновлює збірку й запускає гру знову.
+pub fn relaunch_flag() -> PathBuf {
+    root().join("relaunch.flag")
+}
 pub fn settings_file() -> PathBuf {
     root().join("settings.json")
 }

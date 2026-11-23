@@ -2,6 +2,8 @@ package ua.altherra.client;
 
 import io.netty.buffer.Unpooled;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -20,6 +22,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -54,6 +58,16 @@ public final class AltherraClient implements ClientModInitializer {
 			return CompletableFuture.completedFuture(out);
 		});
 
+		// /перезапустити-гру — сервер пропонує її, коли збірку оновлено (посилання в чаті).
+		ClientCommandRegistrationCallback.EVENT.register((dispatcher, ctx) -> {
+			for (String name : new String[]{"перезапустити-гру", "altherra-relaunch"}) {
+				dispatcher.register(ClientCommands.literal(name).executes(c -> {
+					relaunch(Minecraft.getInstance());
+					return 1;
+				}));
+			}
+		});
+
 		// Успішно зайшли — запамʼятовуємо сервер і скидаємо лічильник спроб.
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
 			ServerData current = client.getCurrentServer();
@@ -79,7 +93,7 @@ public final class AltherraClient implements ClientModInitializer {
 		if (modCheckPending) {
 			// Сервер не пустив через моди: лаунчер має оновити збірку, тож замість перепідключення — підказка.
 			modCheckPending = false;
-			Button hint = Button.builder(Component.literal("Закрий гру й натисни «Грати» в лаунчері"), b -> client.stop())
+			Button hint = Button.builder(Component.literal(canRelaunch() ? "Перезапустити гру з новими модами" : "Закрий гру й натисни «Грати» в лаунчері"), b -> relaunch(client))
 					.bounds(width / 2 - 100, height - 52, 200, 20).build();
 			Screens.getWidgets(screen).add(hint);
 			return;
@@ -119,6 +133,26 @@ public final class AltherraClient implements ClientModInitializer {
 
 	private static Component label(int seconds) {
 		return Component.literal("Перепідключення через " + seconds + " с — скасувати");
+	}
+
+	private static boolean canRelaunch() {
+		return !System.getProperty("altherra.relaunch", "").isBlank();
+	}
+
+	/**
+	 * Закриває гру й просить лаунчер запустити її знову: лаунчер (він чекає, поки гра працює)
+	 * бачить файл-позначку, оновлює збірку й запускає гру. Старий лаунчер без цієї функції — гра просто закривається.
+	 */
+	static void relaunch(Minecraft client) {
+		cancelled = true;
+		String flag = System.getProperty("altherra.relaunch", "");
+		if (!flag.isBlank()) {
+			try {
+				Files.writeString(Path.of(flag), "relaunch");
+			} catch (Exception ignored) {
+			}
+		}
+		client.execute(client::stop);
 	}
 
 	/** «Відʼєднатися» → «Вийти з гри»: закриває Minecraft. */

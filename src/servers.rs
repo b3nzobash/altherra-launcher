@@ -203,13 +203,19 @@ pub fn ensure_server(path: &Path, name: &str, address: &str) -> Result<()> {
         }
     }
     let norm = |s: &str| s.trim().trim_end_matches(":25565").to_ascii_lowercase();
-    let mut ours = vec![("name".to_owned(), Tag::String(name.to_owned())), ("ip".to_owned(), Tag::String(address.to_owned()))];
+    // hidden = 0: гра сама додає «приховані» записи, коли заходить на сервер за адресою з лаунчера,
+    // і такий прапорець ховає сервер зі списку «Мережева гра».
+    let mut ours = vec![
+        ("name".to_owned(), Tag::String(name.to_owned())),
+        ("ip".to_owned(), Tag::String(address.to_owned())),
+        ("hidden".to_owned(), Tag::Byte(0)),
+    ];
     servers.retain(|t| {
         let Tag::Compound(c) = t else { return true };
         if get_str(c, "ip").map(norm) == Some(norm(address)) {
             // Зберігаємо іконку й налаштування ресурспаків, які вже запамʼятала гра.
             for (k, v) in c {
-                if k != "name" && k != "ip" {
+                if k != "name" && k != "ip" && k != "hidden" && !ours.iter().any(|(ok, _)| ok == k) {
                     ours.push((k.clone(), v.clone()));
                 }
             }
@@ -235,6 +241,41 @@ pub fn ensure_server(path: &Path, name: &str, address: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unhides_server_hidden_by_the_game() {
+        let dir = std::env::temp_dir().join(format!("altherra-servers-hidden-{}", std::process::id()));
+        let p = dir.join("servers.dat");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // Так файл залишає гра після входу за адресою з лаунчера: два приховані записи.
+        let hidden = |name: &str, ip: &str| Tag::Compound(vec![
+            ("hidden".to_owned(), Tag::Byte(1)),
+            ("ip".to_owned(), Tag::String(ip.to_owned())),
+            ("name".to_owned(), Tag::String(name.to_owned())),
+            ("icon".to_owned(), Tag::String("PNG".to_owned())),
+        ]);
+        let root = Tag::Compound(vec![("servers".to_owned(), Tag::List(10, vec![hidden("Minecraft Server", "altherra.com.ua:25565"), hidden("Altherra", "altherra.com.ua")]))]);
+        let mut out = vec![10u8];
+        write_str(&mut out, "");
+        write_payload(&mut out, &root);
+        std::fs::write(&p, out).unwrap();
+
+        ensure_server(&p, "Altherra", "altherra.com.ua").unwrap();
+        let bytes = std::fs::read(&p).unwrap();
+        let mut r = Reader { b: &bytes, pos: 0, depth: 0 };
+        r.u8().unwrap();
+        r.string().unwrap();
+        let Tag::Compound(root) = r.payload(10).unwrap() else { panic!() };
+        let Tag::List(_, list) = &root[0].1 else { panic!() };
+        assert_eq!(list.len(), 1, "дублікати прибрано");
+        let Tag::Compound(ours) = &list[0] else { panic!() };
+        let hidden: Vec<_> = ours.iter().filter(|(k, _)| k == "hidden").collect();
+        assert_eq!(hidden.len(), 1);
+        assert!(matches!(hidden[0].1, Tag::Byte(0)), "сервер видно в списку");
+        assert_eq!(get_str(ours, "icon"), Some("PNG"), "іконку збережено");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn keeps_user_servers_and_puts_ours_first() {
