@@ -54,10 +54,21 @@ pub struct Available {
     tag: String,
 }
 
+/// Одна версія для сторінки «Що нового».
+pub struct Change {
+    pub version: String,
+    pub date: String,
+    pub notes: String,
+}
+
 #[derive(Deserialize)]
 struct Release {
     tag_name: String,
     html_url: String,
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    published_at: Option<String>,
     draft: bool,
     prerelease: bool,
 }
@@ -79,20 +90,65 @@ pub fn tag_prefix() -> &'static str {
 }
 
 pub async fn check() -> Result<Option<Available>> {
-    // Релізи обох версій лежать в одному репозиторії — беремо найновіший саме своєї.
+    Ok(check_with_changes().await?.0)
+}
+
+/// Нова версія (якщо є) і список змін своїх релізів — одним запитом до GitHub.
+pub async fn check_with_changes() -> Result<(Option<Available>, Vec<Change>)> {
+    // Релізи обох версій лежать в одному репозиторії — беремо лише свої.
     let list: Vec<Release> = net::get_json(&format!("https://api.github.com/repos/{REPO}/releases?per_page=30")).await?;
-    let Some(cur) = parse_version(current()) else { return Ok(None) };
-    let best = list
+    let mut own: Vec<((u32, u32, u32), Release)> = list
         .into_iter()
         .filter(|r| !r.draft && !r.prerelease && r.tag_name.starts_with(tag_prefix()))
         .filter_map(|r| parse_version(r.tag_name.trim_start_matches(tag_prefix())).map(|v| (v, r)))
-        .max_by_key(|(v, _)| *v);
-    let Some((latest, r)) = best else { return Ok(None) };
-    if latest <= cur {
-        return Ok(None);
+        .collect();
+    own.sort_by(|a, b| b.0.cmp(&a.0));
+    let changes = own
+        .iter()
+        .map(|(v, r)| Change {
+            version: format!("{}.{}.{}", v.0, v.1, v.2),
+            date: r.published_at.as_deref().map(format_date).unwrap_or_default(),
+            notes: release_notes(r.body.as_deref().unwrap_or("")),
+        })
+        .collect();
+    let Some(cur) = parse_version(current()) else { return Ok((None, changes)) };
+    let available = own.into_iter().next().filter(|(v, _)| *v > cur).map(|(latest, r)| {
+        let page = if r.html_url.starts_with("https://github.com/") { r.html_url } else { format!("https://github.com/{REPO}/releases") };
+        Available { version: format!("{}.{}.{}", latest.0, latest.1, latest.2), page, tag: r.tag_name }
+    });
+    Ok((available, changes))
+}
+
+/// «2026-11-23T15:40:21Z» → «23.11.2026»
+fn format_date(s: &str) -> String {
+    let d = s.get(..10).unwrap_or("");
+    let p: Vec<&str> = d.split('-').collect();
+    if p.len() == 3 { format!("{}.{}.{}", p[2], p[1], p[0]) } else { String::new() }
+}
+
+/// Опис змін з тексту релізу: усе до роздільника «---» (далі — посилання на файли).
+/// Розмітку Markdown спрощуємо до звичайного тексту з маркерами «•».
+fn release_notes(body: &str) -> String {
+    let body = body.replace("\r\n", "\n");
+    let part = body.split("\n---").next().unwrap_or("");
+    // Старі релізи мають лише список файлів для завантаження — змін там немає.
+    if part.trim_start().starts_with("- Windows") {
+        return String::new();
     }
-    let page = if r.html_url.starts_with("https://github.com/") { r.html_url } else { format!("https://github.com/{REPO}/releases") };
-    Ok(Some(Available { version: format!("{}.{}.{}", latest.0, latest.1, latest.2), page, tag: r.tag_name }))
+    part.lines()
+        .map(|l| l.trim_end())
+        .filter(|l| !l.starts_with('#'))
+        .map(|l| {
+            let l = l.replace("**", "").replace('`', "");
+            match l.trim_start().strip_prefix("- ").or_else(|| l.trim_start().strip_prefix("* ")) {
+                Some(rest) => format!("• {rest}"),
+                None => l,
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_owned()
 }
 
 /// Скачує нову версію, перевіряє підпис і хеш, підміняє свій файл. Після цього треба перезапуститися.
@@ -173,6 +229,14 @@ mod tests {
         assert_eq!(parse_version("v1.10"), Some((1, 10, 0)));
         assert!(parse_version("launcher-v1.10.0") > parse_version("1.9.9"));
         assert_eq!(parse_version("nightly"), None);
+    }
+
+    #[test]
+    fn notes() {
+        let body = "## Що нового\r\n- **Ресурспаки** вмикаються самі\r\n- Виправлено `options.txt`\r\n\r\n---\r\n- Windows 10/11 — x.exe";
+        assert_eq!(release_notes(body), "• Ресурспаки вмикаються самі\n• Виправлено options.txt");
+        assert_eq!(release_notes("- Windows 10/11 — x.exe\n- Linux"), "");
+        assert_eq!(format_date("2026-11-23T15:40:21Z"), "23.11.2026");
     }
 
     #[test]

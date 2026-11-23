@@ -11,6 +11,13 @@ export struct NewsItem {
     has-cover: bool,
 }
 
+export struct ChangeItem {
+    version: string,
+    date: string,
+    notes: string,
+    current: bool,
+}
+
 export struct AccountItem {
     id: string,
     name: string,
@@ -202,6 +209,8 @@ export component AppWindow inherits Window {
     in property <bool> manifest-offline: false;
     in property <string> manifest-error: "";
     in property <[NewsItem]> news: [];
+    in property <[ChangeItem]> changes: [];
+    in property <bool> changes-loading: true;
     in property <[FileItem]> files: [];
 
     // Акаунти
@@ -301,6 +310,10 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     alignment: center;
                     NavButton { icon: @image-url("../assets/icon-term.svg"); label: "Журнал"; active: root.page == 3; clicked => { root.page = 3; } }
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    NavButton { icon: @image-url("../assets/icon-news.svg"); label: "Що нового"; active: root.page == 4; clicked => { root.page = 4; } }
                 }
             }
         }
@@ -647,6 +660,77 @@ export component AppWindow inherits Window {
                                 font-size: 11px;
                                 color: Theme.muted;
                                 wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+
+                // Що нового
+                if root.page == 4: VerticalLayout {
+                    padding: 40px;
+                    spacing: 18px;
+                    HorizontalLayout {
+                        SectionTitle { text: "Що нового"; font-size: 26px; }
+                        Rectangle { horizontal-stretch: 1; }
+                        Text {
+                            text: "версія " + root.version;
+                            font-family: Theme.mono;
+                            font-size: 12px;
+                            color: Theme.muted;
+                            vertical-alignment: center;
+                        }
+                    }
+                    if root.changes.length == 0: Text {
+                        text: root.changes-loading ? "Завантажуємо історію версій…" : "Не вдалося отримати історію версій з GitHub.";
+                        color: Theme.muted;
+                    }
+                    ScrollView {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: 12px;
+                            for c in root.changes: Card {
+                                border-color: c.current ? Theme.cyan : Theme.line;
+                                VerticalLayout {
+                                    padding: 18px;
+                                    spacing: 8px;
+                                    HorizontalLayout {
+                                        spacing: 10px;
+                                        Text {
+                                            text: c.version;
+                                            font-family: Theme.display;
+                                            font-weight: 800;
+                                            font-size: 16px;
+                                            color: Theme.text;
+                                        }
+                                        if c.current: Rectangle {
+                                            width: cur-label.preferred-width + 14px;
+                                            height: 20px;
+                                            background: Theme.cyan;
+                                            cur-label := Text {
+                                                text: "у тебе";
+                                                font-size: 11px;
+                                                font-weight: 700;
+                                                color: Theme.on-accent;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                        Rectangle { horizontal-stretch: 1; }
+                                        Text {
+                                            text: c.date;
+                                            font-family: Theme.mono;
+                                            font-size: 11px;
+                                            color: Theme.violet;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    Text {
+                                        text: c.notes == "" ? "Опису змін немає." : c.notes;
+                                        font-size: 13px;
+                                        color: c.notes == "" ? Theme.muted : Theme.text;
+                                        wrap: word-wrap;
+                                    }
+                                }
                             }
                         }
                     }

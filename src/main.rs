@@ -612,11 +612,30 @@ fn main() -> Result<(), slint::PlatformError> {
     {
         let (weak, pending) = (ui.as_weak(), pending_update.clone());
         rt().spawn(async move {
-            if let Ok(Some(a)) = update::check().await {
-                let v = a.version.clone();
+            // Один запит до GitHub: і кнопка «Оновити», і сторінка «Що нового».
+            let res = update::check_with_changes().await;
+            let (avail, changes) = match res {
+                Ok((a, c)) => (a, c),
+                Err(_) => (None, Vec::new()),
+            };
+            let v = avail.as_ref().map(|a| a.version.clone());
+            if let Some(a) = avail {
                 *pending.lock().unwrap() = Some(a);
-                let _ = weak.upgrade_in_event_loop(move |ui| ui.set_update_version(v.into()));
             }
+            let cur = update::current().to_owned();
+            let items: Vec<(String, String, String, bool)> =
+                changes.into_iter().map(|c| { let is_cur = c.version == cur; (c.version, c.date, c.notes, is_cur) }).collect();
+            let _ = weak.upgrade_in_event_loop(move |ui| {
+                if let Some(v) = v {
+                    ui.set_update_version(v.into());
+                }
+                let model: Vec<ChangeItem> = items
+                    .into_iter()
+                    .map(|(version, date, notes, current)| ChangeItem { version: version.into(), date: date.into(), notes: notes.into(), current })
+                    .collect();
+                ui.set_changes(ModelRc::new(VecModel::from(model)));
+                ui.set_changes_loading(false);
+            });
         });
     }
     {
