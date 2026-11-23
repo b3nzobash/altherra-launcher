@@ -57,3 +57,7 @@ pub fn manifest_cache() -> PathBuf {
 pub fn sync_state() -> PathBuf {
     root().join("sync-state.json")
 }
+/// Які ресурспаки збірки лаунчер уже ввімкнув у грі (щоб не вмикати знову ті, що гравець вимкнув).
+pub fn packs_state() -> PathBuf {
+    root().join("packs-state.json")
+}
