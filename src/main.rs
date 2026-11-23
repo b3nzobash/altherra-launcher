@@ -470,8 +470,16 @@ fn run(weak: Weak<AppWindow>, state: Shared, launch_game: bool, check_hash: bool
             };
             state.lock().unwrap().game_running = false;
             let crashed = !status.success();
+            // Гравець натиснув у грі «Перезапустити гру» — оновлюємо збірку й запускаємо знову.
+            let relaunch = std::fs::remove_file(paths::relaunch_flag()).is_ok();
+            let state2 = state.clone();
             let _ = weak.upgrade_in_event_loop(move |ui| {
                 ui.set_game_running(false);
+                if relaunch {
+                    ui.set_status_text("Оновлюємо збірку й запускаємо гру знову…".into());
+                    run(ui.as_weak(), state2, true, false);
+                    return;
+                }
                 if settings.after_launch == "close" {
                     slint::quit_event_loop().ok();
                     return;
