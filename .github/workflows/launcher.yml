@@ -160,15 +160,27 @@ jobs:
           openssl pkeyutl -sign -inkey "$RUNNER_TEMP/key.pem" -rawin -in SHA256SUMS.txt -out SHA256SUMS.txt.sig
           rm -f "$RUNNER_TEMP/key.pem"
           ls -la
+      # Опис релізу: зміни з повідомлення тегу (усе після першого рядка), далі «---» і файли.
+      # Лаунчер показує частину до «---» на сторінці «Що нового».
+      - name: Опис релізу
+        run: |
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          {
+            git for-each-ref "refs/tags/$GITHUB_REF_NAME" --format='%(contents:body)' | sed '/^-----BEGIN/,$d'
+            echo
+            echo '---'
+            echo
+            echo "- Windows 10/11 — \`$FILE-Setup-windows-x64.exe\`"
+            echo "- Linux (glibc і musl) — \`$FILE-Setup-linux-x64.run\` (\`sh $FILE-Setup-linux-x64.run\`)"
+            echo "- macOS 11+ — \`$FILE-macos.zip\`"
+            echo
+            echo 'Встановлений лаунчер оновлюється сам — кнопка «Оновити» зверху.'
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
       - uses: softprops/action-gh-release@v2
         with:
           name: ${{ env.APP_NAME }} ${{ github.ref_name }}
           files: dist/*
           # «Останнім» релізом лишається основна версія.
           make_latest: ${{ startsWith(github.ref_name, 'offline') && 'false' || 'true' }}
-          body: |
-            - Windows 10/11 — `${{ env.FILE }}-Setup-windows-x64.exe`
-            - Linux (glibc і musl) — `${{ env.FILE }}-Setup-linux-x64.run` (`sh ${{ env.FILE }}-Setup-linux-x64.run`)
-            - macOS 11+ — `${{ env.FILE }}-macos.zip`
-
-            Встановлений лаунчер оновлюється сам — кнопка «Оновити» зверху.
+          body_path: ${{ runner.temp }}/notes.md
