@@ -8,8 +8,10 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 #[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
 struct State {
-    enabled: BTreeSet<String>,
+    /// «selected», а не «enabled» з 1.4.4: та версія вмикала паки неправильно, тож вони ввімкнуться ще раз.
+    selected: BTreeSet<String>,
 }
 
 pub fn apply(m: &Manifest) {
@@ -17,11 +19,11 @@ pub fn apply(m: &Manifest) {
     let packs: Vec<String> = m.files.iter().filter(|f| f.dir == "resourcepacks").map(|f| f.filename.clone()).collect();
     let options = paths::game_dir().join("options.txt");
     let text = std::fs::read_to_string(&options).unwrap_or_default();
-    let (out, enabled) = update(&text, &packs, &state.enabled);
+    let (out, enabled) = update(&text, &packs, &state.selected);
     if out != text && write_atomic(&options, &out).is_err() {
         return; // наступного запуску спробуємо знову
     }
-    if let Ok(b) = serde_json::to_vec_pretty(&State { enabled }) {
+    if let Ok(b) = serde_json::to_vec_pretty(&State { selected: enabled }) {
         let _ = std::fs::write(paths::packs_state(), b);
     }
 }
@@ -77,15 +79,13 @@ fn update(text: &str, packs: &[String], done: &BTreeSet<String>) -> (String, BTr
         selected.retain(|x| *x != id);
         incompatible.retain(|x| *x != id);
     }
-    // Нові — вмикаємо поверх усього. Позначаємо як «старі за форматом теж можна», інакше гра
-    // мовчки вимкне пак, зроблений для іншої версії (так само, як підтвердити це в меню).
+    // Нові — вмикаємо поверх усього. У incompatibleResourcePacks не додаємо: якщо пак сумісний,
+    // гра прибирає його звідти й через свою помилку заразом не вмикає.
     for p in packs.iter().filter(|p| !done.contains(*p)) {
         let id = format!("file/{p}");
         selected.retain(|x| *x != id);
-        selected.push(id.clone());
-        if !incompatible.contains(&id) {
-            incompatible.push(id);
-        }
+        incompatible.retain(|x| *x != id);
+        selected.push(id);
     }
     let enabled = packs.iter().cloned().collect();
     if (selected.clone(), incompatible.clone()) == before {
@@ -111,7 +111,7 @@ mod tests {
         let text = "version:4000\nresourcePacks:[\"vanilla\",\"fabric\",\"file/Mine.zip\"]\nfov:0.5\n";
         let (out, en) = update(text, &packs(&["Altherra.zip"]), &set(&[]));
         assert!(out.contains("resourcePacks:[\"vanilla\",\"fabric\",\"file/Mine.zip\",\"file/Altherra.zip\"]"));
-        assert!(out.contains("incompatibleResourcePacks:[\"file/Altherra.zip\"]"));
+        assert!(out.contains("incompatibleResourcePacks:[]"));
         assert!(out.starts_with("version:4000\n") && out.contains("fov:0.5\n"));
         assert_eq!(en, set(&["Altherra.zip"]));
     }
@@ -130,8 +130,14 @@ mod tests {
     }
 
     #[test]
+    fn old_state_from_1_4_4_enables_again() {
+        let st: State = serde_json::from_str("{\"enabled\":[\"A.zip\"]}").unwrap();
+        assert!(st.selected.is_empty());
+    }
+
+    #[test]
     fn creates_options_on_first_launch() {
         let (out, _) = update("", &packs(&["A.zip"]), &set(&[]));
-        assert_eq!(out, "resourcePacks:[\"vanilla\",\"file/A.zip\"]\nincompatibleResourcePacks:[\"file/A.zip\"]\n");
+        assert_eq!(out, "resourcePacks:[\"vanilla\",\"file/A.zip\"]\nincompatibleResourcePacks:[]\n");
     }
 }
