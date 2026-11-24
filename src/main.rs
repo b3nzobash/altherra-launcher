@@ -177,11 +177,19 @@ fn push_settings(ui: &AppWindow, s: &Settings, recommended_mb: u32) {
     ui.set_java_path(s.java_path.clone().into());
     ui.set_jvm_args(s.jvm_args.clone().into());
     ui.set_auto_connect(s.auto_connect);
+    let list = gpu::list();
     let gpus: Vec<GpuItem> = std::iter::once(GpuItem { slot: "".into(), name: "Як у системі".into() })
-        .chain(gpu::list().into_iter().map(|g| GpuItem { slot: g.slot.into(), name: g.name.into() }))
+        .chain(list.iter().map(|g| GpuItem { slot: g.slot.clone().into(), name: g.name.clone().into() }))
         .collect();
     ui.set_gpus(ModelRc::new(VecModel::from(gpus)));
+    // Обрана відеокарта зараз не підключена — показуємо її адресу, щоб було видно, що вибір збережено.
+    let name = if s.gpu.is_empty() {
+        "Як у системі".to_owned()
+    } else {
+        list.iter().find(|g| g.slot == s.gpu).map(|g| g.name.clone()).unwrap_or_else(|| "Не підключена".to_owned())
+    };
     ui.set_gpu_slot(s.gpu.clone().into());
+    ui.set_gpu_name(name.into());
     ui.set_after_launch(match s.after_launch.as_str() {
         "keep" => 0,
         "close" => 2,
