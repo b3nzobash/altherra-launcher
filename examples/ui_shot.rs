@@ -42,9 +42,11 @@ fn main() {
     let acc2 = AccountItem { id: "2".into(), name: "Steve_UA".into(), initial: "S".into(), licensed: true, ..Default::default() };
     ui.set_accounts(ModelRc::new(VecModel::from(vec![acc.clone(), acc2])));
     ui.set_files(ModelRc::new(VecModel::from(vec![
-        FileItem { name: "Sodium".into(), dir: "mods".into(), size: "1.8 МБ".into() },
-        FileItem { name: "Fabric API".into(), dir: "mods".into(), size: "2.4 МБ".into() },
-        FileItem { name: "Altherra UI".into(), dir: "resourcepacks".into(), size: "640 КБ".into() },
+        FileItem { name: "Particle Rain".into(), dir: "mods".into(), size: "310 КБ".into(), optional: true, enabled: true },
+        FileItem { name: "Falling Leaves".into(), dir: "mods".into(), size: "96 КБ".into(), optional: true, enabled: false },
+        FileItem { name: "Sodium".into(), dir: "mods".into(), size: "1.8 МБ".into(), optional: false, enabled: true },
+        FileItem { name: "Fabric API".into(), dir: "mods".into(), size: "2.4 МБ".into(), optional: false, enabled: true },
+        FileItem { name: "Altherra UI".into(), dir: "resourcepacks".into(), size: "640 КБ".into(), optional: false, enabled: true },
     ])));
     ui.set_log_lines(ModelRc::new(VecModel::from(vec!["[19:52:01] [Render thread/INFO]: Setting user: b3nzobash".into(), "[19:52:03] [Render thread/INFO]: Backend library: LWJGL version 3.4.3".into()])));
     ui.set_stats_visible(true);
@@ -53,6 +55,15 @@ fn main() {
     ui.set_stats_unique("27".into());
     ui.set_stats_tps("19.9".into());
     ui.set_stats_uptime("3 д 4 год".into());
+    ui.set_has_optional(true);
+    ui.set_playtime("12 год 34 хв".into());
+    ui.set_gpus(ModelRc::new(VecModel::from(vec![
+        GpuItem { slot: "".into(), name: "Як у системі".into() },
+        GpuItem { slot: "0000:00:02.0".into(), name: "Intel UHD Graphics".into() },
+        GpuItem { slot: "0000:04:00.0".into(), name: "AMD Radeon RX 470/480/570/570X/580/580X/590".into() },
+    ])));
+    ui.set_gpu_slot("0000:04:00.0".into());
+    ui.set_gpu_name("AMD Radeon RX 470/480/570/570X/580/580X/590".into());
     ui.show().unwrap();
 
     shot(&win, w, h, &format!("{out}/ui-home-empty.png"));
