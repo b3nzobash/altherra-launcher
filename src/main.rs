@@ -9,6 +9,7 @@ mod mojang;
 mod net;
 mod packs;
 mod paths;
+mod playtime;
 mod ping;
 mod required;
 mod servers;
@@ -479,10 +480,25 @@ fn run(weak: Weak<AppWindow>, state: Shared, launch_game: bool, check_hash: bool
                 }
             });
 
-            let status = tokio::select! {
-                s = child.wait() => s?,
-                _ = kill_rx => { let _ = child.kill().await; child.wait().await? }
+            // Рахуємо награний час: щохвилини додаємо й зберігаємо, наприкінці — залишок.
+            let started = std::time::Instant::now();
+            let mut counted = 0u64;
+            let mut minute = tokio::time::interval_at(tokio::time::Instant::now() + std::time::Duration::from_secs(60), std::time::Duration::from_secs(60));
+            tokio::pin!(kill_rx);
+            let status = loop {
+                tokio::select! {
+                    s = child.wait() => break s?,
+                    _ = &mut kill_rx => { let _ = child.kill().await; break child.wait().await? }
+                    _ = minute.tick() => {
+                        let now = started.elapsed().as_secs();
+                        let total = playtime::add(now - counted);
+                        counted = now;
+                        let _ = weak.upgrade_in_event_loop(move |ui| ui.set_playtime(playtime::format(total).into()));
+                    }
+                }
             };
+            let total = playtime::add(started.elapsed().as_secs() - counted);
+            let _ = weak.upgrade_in_event_loop(move |ui| ui.set_playtime(playtime::format(total).into()));
             state.lock().unwrap().game_running = false;
             let crashed = !status.success();
             // Гравець натиснув у грі «Перезапустити гру» — оновлюємо збірку й запускаємо знову.
@@ -600,6 +616,10 @@ fn main() -> Result<(), slint::PlatformError> {
     let state: Shared = Arc::new(Mutex::new(State { accounts: Accounts::load(), settings: Settings::load(), ..Default::default() }));
 
     ui.set_version(env!("CARGO_PKG_VERSION").into());
+    let played = playtime::total();
+    if played > 0 {
+        ui.set_playtime(playtime::format(played).into());
+    }
     ui.set_edition_official(OFFICIAL);
     ui.global::<Theme>().set_offline(!OFFICIAL);
     ui.set_game_dir(paths::game_dir().to_string_lossy().into_owned().into());
