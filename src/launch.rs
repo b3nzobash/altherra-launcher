@@ -224,6 +224,14 @@ pub fn spawn(p: &Prepared, m: &Manifest, s: &Settings, acc: &Account, on_line: i
 
     let mut cmd = tokio::process::Command::new(&p.java);
     cmd.args(&args).current_dir(&game).stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
+    // Обрана відеокарта. Якщо її зараз немає (eGPU відʼєднано) — гра піде на ту, що за замовчуванням.
+    if !s.gpu.is_empty() {
+        if let Some(env) = crate::gpu::env_for(&s.gpu) {
+            for (k, v) in env {
+                cmd.env(k, v);
+            }
+        }
+    }
     #[cfg(windows)]
     {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
