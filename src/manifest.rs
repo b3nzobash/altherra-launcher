@@ -49,6 +49,8 @@ pub struct FileEntry {
     pub size: u64,
     pub url: String,
     pub fallback: Option<String>,
+    /// Обовʼязковий ресурспак: вмикаємо при кожному запуску, навіть якщо гравець вимкнув.
+    pub required: bool,
 }
 
 const DIRS: [&str; 4] = ["mods", "resourcepacks", "shaderpacks", "config"];
@@ -69,7 +71,7 @@ mod fingerprint_tests {
     /// sha1("mods/a.jar:aa") — те саме значення має порахувати сервер (Java).
     const FP_A: &str = "546ae3f6237f7d2814bcd9f8e8968ac6b5972e4d";
     fn f(dir: &str, name: &str, sha: &str) -> FileEntry {
-        FileEntry { name: name.into(), dir: dir.into(), filename: name.into(), sha1: sha.into(), size: 1, url: String::new(), fallback: None }
+        FileEntry { name: name.into(), dir: dir.into(), filename: name.into(), sha1: sha.into(), size: 1, url: String::new(), fallback: None, required: false }
     }
     #[test]
     fn order_does_not_matter_but_content_does() {

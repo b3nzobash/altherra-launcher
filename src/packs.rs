@@ -17,9 +17,10 @@ struct State {
 pub fn apply(m: &Manifest) {
     let state: State = std::fs::read(paths::packs_state()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
     let packs: Vec<String> = m.files.iter().filter(|f| f.dir == "resourcepacks").map(|f| f.filename.clone()).collect();
+    let required: BTreeSet<String> = m.files.iter().filter(|f| f.dir == "resourcepacks" && f.required).map(|f| f.filename.clone()).collect();
     let options = paths::game_dir().join("options.txt");
     let text = std::fs::read_to_string(&options).unwrap_or_default();
-    let (out, enabled) = update(&text, &packs, &state.selected);
+    let (out, enabled) = update(&text, &packs, &state.selected, &required);
     if out != text && write_atomic(&options, &out).is_err() {
         return; // наступного запуску спробуємо знову
     }
@@ -67,7 +68,7 @@ fn set_list(text: &str, key: &str, list: &[String]) -> String {
 }
 
 /// Повертає новий options.txt і новий список «уже ввімкнених» паків.
-fn update(text: &str, packs: &[String], done: &BTreeSet<String>) -> (String, BTreeSet<String>) {
+fn update(text: &str, packs: &[String], done: &BTreeSet<String>, required: &BTreeSet<String>) -> (String, BTreeSet<String>) {
     let mut selected = read_list(text, "resourcePacks").unwrap_or_else(|| vec!["vanilla".into()]);
     // Порожній список (навіть без "vanilla") лишає сама гра, коли пак не завантажився:
     // «Caught error loading resourcepacks, removing all selected». Гравець так зробити не може —
@@ -101,6 +102,14 @@ fn update(text: &str, packs: &[String], done: &BTreeSet<String>) -> (String, BTr
         incompatible.retain(|x| *x != id);
         selected.push(id);
     }
+    // Обовʼязкові — завжди ввімкнені: гравець вимкнув — повертаємо поверх усього.
+    for p in packs.iter().filter(|p| required.contains(*p)) {
+        let id = format!("file/{p}");
+        if !selected.contains(&id) {
+            incompatible.retain(|x| *x != id);
+            selected.push(id);
+        }
+    }
     let enabled = packs.iter().cloned().collect();
     if (selected.clone(), incompatible.clone()) == before {
         return (text.to_owned(), enabled);
@@ -123,7 +132,7 @@ mod tests {
     #[test]
     fn enables_new_pack_on_top_and_keeps_other_options() {
         let text = "version:4000\nresourcePacks:[\"vanilla\",\"fabric\",\"file/Mine.zip\"]\nfov:0.5\n";
-        let (out, en) = update(text, &packs(&["Altherra.zip"]), &set(&[]));
+        let (out, en) = update(text, &packs(&["Altherra.zip"]), &set(&[]), &set(&[]));
         assert!(out.contains("resourcePacks:[\"vanilla\",\"fabric\",\"file/Mine.zip\",\"file/Altherra.zip\"]"));
         assert!(out.contains("incompatibleResourcePacks:[]"));
         assert!(out.starts_with("version:4000\n") && out.contains("fov:0.5\n"));
@@ -134,11 +143,11 @@ mod tests {
     fn respects_player_disabling_and_removes_dropped() {
         // Гравець вимкнув Altherra.zip — більше не вмикаємо.
         let text = "resourcePacks:[\"vanilla\"]\n";
-        let (out, _) = update(text, &packs(&["Altherra.zip"]), &set(&["Altherra.zip"]));
+        let (out, _) = update(text, &packs(&["Altherra.zip"]), &set(&["Altherra.zip"]), &set(&[]));
         assert_eq!(out, text);
         // Пак прибрали зі збірки — зникає зі списку.
         let text = "resourcePacks:[\"vanilla\",\"file/Old.zip\"]\nincompatibleResourcePacks:[\"file/Old.zip\"]\n";
-        let (out, en) = update(text, &packs(&[]), &set(&["Old.zip"]));
+        let (out, en) = update(text, &packs(&[]), &set(&["Old.zip"]), &set(&[]));
         assert_eq!(out, "resourcePacks:[\"vanilla\"]\nincompatibleResourcePacks:[]\n");
         assert!(en.is_empty());
     }
@@ -152,13 +161,21 @@ mod tests {
     #[test]
     fn reenables_after_game_reset_and_puts_extensions_on_top() {
         let text = "resourcePacks:[]\nincompatibleResourcePacks:[]\n";
-        let (out, _) = update(text, &packs(&["FA_Extensions.zip", "FreshAnimations.zip"]), &set(&["FA_Extensions.zip"]));
+        let (out, _) = update(text, &packs(&["FA_Extensions.zip", "FreshAnimations.zip"]), &set(&["FA_Extensions.zip"]), &set(&[]));
         assert_eq!(out, "resourcePacks:[\"vanilla\",\"file/FreshAnimations.zip\",\"file/FA_Extensions.zip\"]\nincompatibleResourcePacks:[]\n");
     }
 
     #[test]
+    fn required_pack_comes_back() {
+        // Гравець вимкнув обовʼязковий пак — лаунчер вмикає знову; необовʼязковий не чіпає.
+        let text = "resourcePacks:[\"vanilla\"]\n";
+        let (out, _) = update(text, &packs(&["A.zip", "B.zip"]), &set(&["A.zip", "B.zip"]), &set(&["B.zip"]));
+        assert_eq!(out, "resourcePacks:[\"vanilla\",\"file/B.zip\"]\nincompatibleResourcePacks:[]\n");
+    }
+
+    #[test]
     fn creates_options_on_first_launch() {
-        let (out, _) = update("", &packs(&["A.zip"]), &set(&[]));
+        let (out, _) = update("", &packs(&["A.zip"]), &set(&[]), &set(&[]));
         assert_eq!(out, "resourcePacks:[\"vanilla\",\"file/A.zip\"]\nincompatibleResourcePacks:[]\n");
     }
 }
