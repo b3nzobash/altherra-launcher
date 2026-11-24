@@ -34,8 +34,7 @@ import java.util.concurrent.CompletableFuture;
  * Altherra Client:
  *  - після кіку чи обриву звʼязку гра сама перепідключається до сервера (з відліком, кнопками «Підключитися зараз» і «Скасувати»), скільки б разів це не знадобилося;
  *  - кнопка «Відʼєднатися» в меню паузи стає «Вийти з гри» і закриває Minecraft;
- *  - під час входу відповідає серверу Altherra списком своїх модів (див. {@link ModList});
- *  - зберігає ключ входу від сервера, щоб наступного разу не вводити /login (див. {@link LoginKeys}).
+ *  - під час входу відповідає серверу Altherra списком своїх модів (див. {@link ModList}).
  * Сервер береться з -Daltherra.server=host:port (його передає лаунчер) або з останнього, до якого гравець заходив.
  */
 public final class AltherraClient implements ClientModInitializer {
@@ -56,7 +55,6 @@ public final class AltherraClient implements ClientModInitializer {
 			lastServer = new ServerData("Altherra", fromLauncher, ServerData.Type.OTHER);
 		}
 
-		LoginKeys.register();
 		ClientLoginNetworking.registerGlobalReceiver(ModList.CHANNEL, (client, handler, buf, listenerAdder) -> {
 			modCheckPending = true;
 			FriendlyByteBuf out = new FriendlyByteBuf(Unpooled.buffer());
