@@ -154,15 +154,24 @@ fn push_manifest(ui: &AppWindow, m: &Manifest, online: bool) {
     }
     info += &format!(" · ревізія {}", m.revision);
     ui.set_build_info(info.into());
-    let files: Vec<FileItem> = m
-        .files
-        .iter()
+    push_files(ui, m, &Settings::load());
+}
+
+/// Список файлів збірки на сторінці «Збірка»: необовʼязкові моди — першими, з перемикачами.
+fn push_files(ui: &AppWindow, m: &Manifest, s: &Settings) {
+    let mut list: Vec<&manifest::FileEntry> = m.files.iter().collect();
+    list.sort_by_key(|f| !f.optional);
+    let files: Vec<FileItem> = list
+        .into_iter()
         .map(|f| FileItem {
             name: f.name.clone().into(),
             dir: f.dir.clone().into(),
             size: if f.size >= 1048576 { format!("{:.1} МБ", f.size as f64 / 1048576.0) } else { format!("{} КБ", (f.size / 1024).max(1)) }.into(),
+            optional: f.optional,
+            enabled: !s.disabled_mods.contains(&f.name),
         })
         .collect();
+    ui.set_has_optional(m.files.iter().any(|f| f.optional));
     ui.set_files(ModelRc::new(VecModel::from(files)));
 }
 
@@ -788,6 +797,24 @@ fn main() -> Result<(), slint::PlatformError> {
         ui.on_kill_game(move || {
             if let Some(k) = state.lock().unwrap().kill.take() {
                 let _ = k.send(());
+            }
+        });
+    }
+
+    // Необовʼязкові моди: гравець вмикає/вимикає на сторінці «Збірка».
+    {
+        let (weak, state) = (ui.as_weak(), state.clone());
+        ui.on_toggle_mod(move |name, on| {
+            let Some(ui) = weak.upgrade() else { return };
+            let mut st = state.lock().unwrap();
+            let name = name.to_string();
+            st.settings.disabled_mods.retain(|n| *n != name);
+            if !on {
+                st.settings.disabled_mods.push(name);
+            }
+            st.settings.save();
+            if let Some(m) = st.manifest.clone() {
+                push_files(&ui, &m, &st.settings);
             }
         });
     }
