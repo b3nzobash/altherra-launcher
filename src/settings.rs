@@ -15,11 +15,13 @@ pub struct Settings {
     pub auto_connect: bool,
     pub width: u32,
     pub height: u32,
+    /// Адреса PCI відеокарти для гри (Linux). Порожньо — як вирішить система.
+    pub gpu: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { ram_mb: 0, java_path: String::new(), jvm_args: String::new(), after_launch: "minimize".into(), auto_connect: true, width: 0, height: 0 }
+        Self { ram_mb: 0, java_path: String::new(), jvm_args: String::new(), after_launch: "minimize".into(), auto_connect: true, width: 0, height: 0, gpu: String::new() }
     }
 }
 

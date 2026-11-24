@@ -2,6 +2,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod auth;
+mod gpu;
 mod launch;
 mod manifest;
 mod mojang;
@@ -176,6 +177,11 @@ fn push_settings(ui: &AppWindow, s: &Settings, recommended_mb: u32) {
     ui.set_java_path(s.java_path.clone().into());
     ui.set_jvm_args(s.jvm_args.clone().into());
     ui.set_auto_connect(s.auto_connect);
+    let gpus: Vec<GpuItem> = std::iter::once(GpuItem { slot: "".into(), name: "Як у системі".into() })
+        .chain(gpu::list().into_iter().map(|g| GpuItem { slot: g.slot.into(), name: g.name.into() }))
+        .collect();
+    ui.set_gpus(ModelRc::new(VecModel::from(gpus)));
+    ui.set_gpu_slot(s.gpu.clone().into());
     ui.set_after_launch(match s.after_launch.as_str() {
         "keep" => 0,
         "close" => 2,
@@ -770,6 +776,7 @@ fn main() -> Result<(), slint::PlatformError> {
             st.settings.java_path = ui.get_java_path().to_string();
             st.settings.jvm_args = ui.get_jvm_args().to_string();
             st.settings.auto_connect = ui.get_auto_connect();
+            st.settings.gpu = ui.get_gpu_slot().to_string();
             st.settings.after_launch = ["keep", "minimize", "close"][ui.get_after_launch().clamp(0, 2) as usize].to_owned();
             st.settings.save();
         });
