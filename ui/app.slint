@@ -155,8 +155,9 @@ component NewsCard inherits Rectangle {
 component SettingRow inherits Rectangle {
     in property <string> title;
     in property <string> hint;
-    min-height: 64px;
-    HorizontalLayout {
+    // Рядок росте під вміст (напр. список відеокарт), інакше вміст налазить на наступні рядки.
+    min-height: max(64px, row.preferred-height);
+    row := HorizontalLayout {
         spacing: 24px;
         VerticalLayout {
             alignment: center;
@@ -248,6 +249,7 @@ export component AppWindow inherits Window {
     // Перший пункт — «Як у системі» (slot ""), далі відеокарти. Показуємо, коли відеокарт хоча б дві.
     in property <[GpuItem]> gpus: [];
     in-out property <string> gpu-slot: "";
+    in-out property <string> gpu-name: "Як у системі";
     in-out property <int> after-launch: 1;
     in-out property <bool> auto-connect: true;
     in property <string> game-dir: "";
@@ -599,51 +601,92 @@ export component AppWindow inherits Window {
                                 if root.gpus.length > 2: SettingRow {
                                     title: "Відеокарта";
                                     hint: "На якій відеокарті запускати гру. Якщо обраної зараз немає (наприклад, eGPU відʼєднано) — гра піде на ту, що за замовчуванням.";
-                                    VerticalLayout {
+                                    // Випадний список: кнопка з поточною відеокартою, під нею — варіанти.
+                                    gpu-box := Rectangle {
+                                        y: 11px;
                                         width: 330px;
-                                        padding-top: 12px;
-                                        padding-bottom: 12px;
-                                        spacing: 6px;
-                                        for g in root.gpus : Rectangle {
-                                            height: g.slot == "" ? 36px : 48px;
-                                            background: g.slot == root.gpu-slot ? Theme.line : (gta.has-hover ? #ffffff0a : Theme.bg.with-alpha(0.75));
-                                            border-width: 2px;
-                                            border-color: g.slot == root.gpu-slot ? Theme.cyan : Theme.line-strong;
-                                            HorizontalLayout {
-                                                padding-left: 12px;
-                                                padding-right: 12px;
-                                                spacing: 10px;
-                                                Rectangle {
-                                                    width: 12px;
-                                                    height: 12px;
-                                                    y: (parent.height - 12px) / 2;
-                                                    border-width: 2px;
-                                                    border-color: g.slot == root.gpu-slot ? Theme.cyan : Theme.muted;
-                                                    background: g.slot == root.gpu-slot ? Theme.cyan : transparent;
-                                                }
-                                                VerticalLayout {
-                                                    alignment: center;
-                                                    spacing: 2px;
-                                                    Text {
-                                                        text: g.name;
-                                                        font-weight: 700;
-                                                        font-size: 13px;
-                                                        color: Theme.text;
-                                                        overflow: elide;
-                                                    }
-                                                    if g.slot != "": Text {
-                                                        text: "PCI " + g.slot;
-                                                        font-family: Theme.mono;
-                                                        font-size: 11px;
-                                                        color: Theme.muted;
-                                                    }
-                                                }
+                                        height: 42px;
+                                        background: gpu-ta.has-hover ? #ffffff0a : Theme.bg.with-alpha(0.75);
+                                        border-width: 2px;
+                                        border-color: gpu-ta.has-hover ? Theme.cyan : Theme.line-strong;
+                                        HorizontalLayout {
+                                            padding-left: 13px;
+                                            padding-right: 12px;
+                                            spacing: 8px;
+                                            Text {
+                                                horizontal-stretch: 1;
+                                                text: root.gpu-name;
+                                                color: Theme.text;
+                                                font-size: 14px;
+                                                vertical-alignment: center;
+                                                overflow: elide;
                                             }
-                                            gta := TouchArea {
-                                                mouse-cursor: pointer;
-                                                clicked => {
-                                                    root.gpu-slot = g.slot;
-                                                    root.save-settings();
+                                            Text {
+                                                text: root.gpu-slot == "" ? "" : root.gpu-slot;
+                                                font-family: Theme.mono;
+                                                font-size: 11px;
+                                                color: Theme.muted;
+                                                vertical-alignment: center;
+                                            }
+                                            Text {
+                                                text: "▾";
+                                                color: Theme.muted;
+                                                font-size: 14px;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                        gpu-ta := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { gpu-popup.show(); }
+                                        }
+                                        gpu-popup := PopupWindow {
+                                            x: 0;
+                                            y: parent.height + 2px;
+                                            width: parent.width;
+                                            Rectangle {
+                                                background: Theme.surface;
+                                                border-width: 2px;
+                                                border-color: Theme.line-strong;
+                                                VerticalLayout {
+                                                    padding: 2px;
+                                                    for g in root.gpus : Rectangle {
+                                                        height: g.slot == "" ? 36px : 46px;
+                                                        background: g.slot == root.gpu-slot ? Theme.line : (opt-ta.has-hover ? #ffffff0d : transparent);
+                                                        HorizontalLayout {
+                                                            padding-left: 11px;
+                                                            padding-right: 11px;
+                                                            spacing: 10px;
+                                                            Rectangle {
+                                                                width: 3px;
+                                                                background: g.slot == root.gpu-slot ? Theme.cyan : transparent;
+                                                            }
+                                                            VerticalLayout {
+                                                                alignment: center;
+                                                                spacing: 2px;
+                                                                Text {
+                                                                    text: g.name;
+                                                                    font-weight: 700;
+                                                                    font-size: 13px;
+                                                                    color: Theme.text;
+                                                                    overflow: elide;
+                                                                }
+                                                                if g.slot != "": Text {
+                                                                    text: "PCI " + g.slot;
+                                                                    font-family: Theme.mono;
+                                                                    font-size: 11px;
+                                                                    color: Theme.muted;
+                                                                }
+                                                            }
+                                                        }
+                                                        opt-ta := TouchArea {
+                                                            mouse-cursor: pointer;
+                                                            clicked => {
+                                                                root.gpu-slot = g.slot;
+                                                                root.gpu-name = g.name;
+                                                                root.save-settings();
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
