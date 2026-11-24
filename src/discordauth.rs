@@ -28,8 +28,11 @@ fn keys_file() -> std::path::PathBuf {
     paths::game_dir().join("altherra").join("login-keys.json")
 }
 
+/// «адреса|нік», як у моді Altherra Client; стандартний порт :25565 не пишемо — гра підключається з ним, лаунчер без.
 fn key_id(address: &str, nick: &str) -> String {
-    format!("{}|{}", address.trim().to_lowercase(), nick.to_lowercase())
+    let a = address.trim().to_lowercase();
+    let a = a.strip_suffix(":25565").unwrap_or(&a);
+    format!("{}|{}", a, nick.to_lowercase())
 }
 
 fn load_keys() -> HashMap<String, String> {
@@ -242,5 +245,7 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(r#"{"text":"","extra":[{"text":"ALTHERRA_AUTH "},{"text":"{\"status\":\"ok\"}"}]}"#).unwrap();
         assert_eq!(flatten(&v), "ALTHERRA_AUTH {\"status\":\"ok\"}");
         assert_eq!(key_id(" Altherra.com.ua ", "B3nzo"), "altherra.com.ua|b3nzo");
+        assert_eq!(key_id("altherra.com.ua:25565", "b3nzo"), key_id("altherra.com.ua", "b3nzo"));
+        assert_eq!(key_id("play.example.org:25570", "x"), "play.example.org:25570|x");
     }
 }
