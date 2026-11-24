@@ -505,8 +505,8 @@ fn run(weak: Weak<AppWindow>, state: Shared, launch_game: bool, check_hash: bool
                 }
                 (false, a) => a,
             };
-            // Вхід через Discord (для ніків без ліцензії): спершу питаємо сервер, чи пустить, і за потреби показуємо код.
-            if let Some(a) = account.as_ref().filter(|a| launch_game && a.kind == Kind::Offline && !m.server_address.is_empty()) {
+            // Вхід через Discord: спершу питаємо сервер, чи пустить, і за потреби показуємо код (один раз — далі ключ).
+            if let Some(a) = account.as_ref().filter(|_| launch_game && !m.server_address.is_empty()) {
                 discord_login(&weak, &state, &m.server_address, &a.name).await?;
             }
             let reporter = Arc::new(UiReporter(weak.clone(), Mutex::new(std::time::Instant::now())));

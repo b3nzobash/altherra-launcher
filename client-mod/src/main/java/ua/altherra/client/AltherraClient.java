@@ -96,6 +96,11 @@ public final class AltherraClient implements ClientModInitializer {
 
 	/** Екран «Втрачено зʼєднання»: відлік і автоматичне перепідключення. */
 	private static void onDisconnected(Minecraft client, Screen screen, int width, int height) {
+		// Сервер просить підтвердити вхід кодом у Discord — це не про моди: звичайне перепідключення,
+		// щоб гра зайшла сама, щойно гравець надішле код боту.
+		if (modCheckPending && reasonText(screen).contains("Discord")) {
+			modCheckPending = false;
+		}
 		if (modCheckPending) {
 			// Сервер не пустив через моди: лаунчер має оновити збірку, тож замість перепідключення — підказка.
 			modCheckPending = false;
@@ -159,6 +164,23 @@ public final class AltherraClient implements ClientModInitializer {
 			cancelled = false;
 			ConnectScreen.startConnecting(new TitleScreen(), client, ServerAddress.parseString(target.ip), target, false, null);
 		});
+	}
+
+	/** Текст причини відʼєднання з екрана (поле DisconnectionDetails або Component — шукаємо будь-яке). */
+	private static String reasonText(Screen screen) {
+		StringBuilder out = new StringBuilder();
+		for (Class<?> c = screen.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+			for (var f : c.getDeclaredFields()) {
+				try {
+					f.setAccessible(true);
+					Object v = f.get(screen);
+					if (v instanceof Component comp) out.append(comp.getString()).append('\n');
+					else if (v instanceof net.minecraft.network.DisconnectionDetails d) out.append(d.reason().getString()).append('\n');
+				} catch (Exception ignored) {
+				}
+			}
+		}
+		return out.toString();
 	}
 
 	private static Component statusText(int seconds) {
