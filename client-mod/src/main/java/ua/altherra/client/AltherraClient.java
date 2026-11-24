@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -19,7 +20,9 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.nio.file.Files;
@@ -29,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Altherra Client:
- *  - після кіку чи обриву звʼязку гра сама перепідключається до сервера (з відліком і кнопкою «Скасувати»), скільки б разів це не знадобилося;
+ *  - після кіку чи обриву звʼязку гра сама перепідключається до сервера (з відліком, кнопками «Підключитися зараз» і «Скасувати»), скільки б разів це не знадобилося;
  *  - кнопка «Відʼєднатися» в меню паузи стає «Вийти з гри» і закриває Minecraft;
  *  - під час входу відповідає серверу Altherra списком своїх модів (див. {@link ModList}).
  * Сервер береться з -Daltherra.server=host:port (його передає лаунчер) або з останнього, до якого гравець заходив.
@@ -43,6 +46,7 @@ public final class AltherraClient implements ClientModInitializer {
 	private static boolean cancelled = false;
 	/** Сервер спитав моди, а у світ ми ще не зайшли: якщо зараз відʼєднає — це відмова через моди, і перепідключення не допоможе. */
 	private static boolean modCheckPending = false;
+	private static boolean connecting = false;
 
 	@Override
 	public void onInitializeClient() {
@@ -98,41 +102,68 @@ public final class AltherraClient implements ClientModInitializer {
 			Screens.getWidgets(screen).add(hint);
 			return;
 		}
-		if (lastServer == null || cancelled) {
+		if (lastServer == null) {
+			return;
+		}
+		List<AbstractWidget> widgets = Screens.getWidgets(screen);
+		int y = height - 56;
+
+		// Рядок стану над кнопками: відлік або «скасовано».
+		StringWidget status = new StringWidget(width / 2 - 150, y, 300, 12, Component.empty(), client.font);
+		widgets.add(status);
+
+		// Дві кнопки поруч: підключитися одразу, не чекаючи відліку, і скасувати автопідключення.
+		Button now = Button.builder(Component.literal("Підключитися зараз"), b -> connect(client))
+				.bounds(width / 2 - 102, y + 16, 100, 20).build();
+		Button cancel = Button.builder(Component.literal("Скасувати"), b -> {
+			cancelled = true;
+			b.active = false;
+		}).bounds(width / 2 + 2, y + 16, 100, 20).build();
+		widgets.add(now);
+		widgets.add(cancel);
+
+		if (cancelled) {
+			// Автопідключення вже скасували раніше — лишаємо лише ручну кнопку.
+			status.setMessage(Component.literal("Автопідключення вимкнено").withStyle(ChatFormatting.GRAY));
+			cancel.active = false;
 			return;
 		}
 		int delay = DELAYS[Math.min(attempt, DELAYS.length - 1)];
 		long reconnectAt = System.currentTimeMillis() + delay * 1000L;
-		List<AbstractWidget> buttons = Screens.getWidgets(screen);
-
-		Button counter = Button.builder(label(delay), b -> {
-			cancelled = true;
-			b.setMessage(Component.literal("Перепідключення скасовано"));
-			b.active = false;
-		}).bounds(width / 2 - 100, height - 52, 200, 20).build();
-		buttons.add(counter);
+		status.setMessage(statusText(delay));
 
 		ScreenEvents.afterTick(screen).register(s -> {
 			if (cancelled) {
+				status.setMessage(Component.literal("Автопідключення скасовано").withStyle(ChatFormatting.GRAY));
 				return;
 			}
 			long left = reconnectAt - System.currentTimeMillis();
 			if (left <= 0) {
-				cancelled = true; // щоб не запустити двічі з цього ж екрана
-				attempt++;
-				ServerData target = lastServer;
-				client.execute(() -> {
-					cancelled = false;
-					ConnectScreen.startConnecting(new TitleScreen(), client, ServerAddress.parseString(target.ip), target, false, null);
-				});
+				connect(client);
 			} else {
-				counter.setMessage(label((int) Math.ceil(left / 1000.0)));
+				status.setMessage(statusText((int) Math.ceil(left / 1000.0)));
 			}
 		});
 	}
 
-	private static Component label(int seconds) {
-		return Component.literal("Перепідключення через " + seconds + " с — скасувати");
+	/** Підключитися до сервера Altherra зараз (і з відліку, і з кнопки). */
+	private static void connect(Minecraft client) {
+		ServerData target = lastServer;
+		if (target == null || connecting) return;
+		connecting = true; // щоб відлік і кнопка не запустили підключення двічі
+		attempt++;
+		client.execute(() -> {
+			connecting = false;
+			cancelled = false;
+			ConnectScreen.startConnecting(new TitleScreen(), client, ServerAddress.parseString(target.ip), target, false, null);
+		});
+	}
+
+	private static Component statusText(int seconds) {
+		MutableComponent t = Component.literal("Підключимося знову через ").withStyle(ChatFormatting.GRAY)
+				.append(Component.literal(seconds + " с").withStyle(ChatFormatting.WHITE));
+		if (attempt > 0) t.append(Component.literal("  ·  спроба " + (attempt + 1)).withStyle(ChatFormatting.DARK_GRAY));
+		return t;
 	}
 
 	private static boolean canRelaunch() {
