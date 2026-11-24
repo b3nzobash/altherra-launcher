@@ -69,6 +69,17 @@ fn set_list(text: &str, key: &str, list: &[String]) -> String {
 /// Повертає новий options.txt і новий список «уже ввімкнених» паків.
 fn update(text: &str, packs: &[String], done: &BTreeSet<String>) -> (String, BTreeSet<String>) {
     let mut selected = read_list(text, "resourcePacks").unwrap_or_else(|| vec!["vanilla".into()]);
+    // Порожній список (навіть без "vanilla") лишає сама гра, коли пак не завантажився:
+    // «Caught error loading resourcepacks, removing all selected». Гравець так зробити не може —
+    // тоді вмикаємо паки збірки заново, ніби вперше.
+    let reset = selected.is_empty();
+    let empty = BTreeSet::new();
+    let done = if reset {
+        selected.push("vanilla".into());
+        &empty
+    } else {
+        done
+    };
     let mut incompatible = read_list(text, "incompatibleResourcePacks").unwrap_or_default();
     let before = (selected.clone(), incompatible.clone());
     let current: BTreeSet<&String> = packs.iter().collect();
@@ -81,7 +92,10 @@ fn update(text: &str, packs: &[String], done: &BTreeSet<String>) -> (String, BTr
     }
     // Нові — вмикаємо поверх усього. У incompatibleResourcePacks не додаємо: якщо пак сумісний,
     // гра прибирає його звідти й через свою помилку заразом не вмикає.
-    for p in packs.iter().filter(|p| !done.contains(*p)) {
+    // Розширення (напр. «Fresh Animations: Extensions») мають стояти вище базового пака.
+    let mut fresh: Vec<&String> = packs.iter().filter(|p| !done.contains(*p)).collect();
+    fresh.sort_by_key(|p| p.to_lowercase().contains("extension"));
+    for p in fresh {
         let id = format!("file/{p}");
         selected.retain(|x| *x != id);
         incompatible.retain(|x| *x != id);
@@ -133,6 +147,13 @@ mod tests {
     fn old_state_from_1_4_4_enables_again() {
         let st: State = serde_json::from_str("{\"enabled\":[\"A.zip\"]}").unwrap();
         assert!(st.selected.is_empty());
+    }
+
+    #[test]
+    fn reenables_after_game_reset_and_puts_extensions_on_top() {
+        let text = "resourcePacks:[]\nincompatibleResourcePacks:[]\n";
+        let (out, _) = update(text, &packs(&["FA_Extensions.zip", "FreshAnimations.zip"]), &set(&["FA_Extensions.zip"]));
+        assert_eq!(out, "resourcePacks:[\"vanilla\",\"file/FreshAnimations.zip\",\"file/FA_Extensions.zip\"]\nincompatibleResourcePacks:[]\n");
     }
 
     #[test]
