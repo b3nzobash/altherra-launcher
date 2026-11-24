@@ -17,11 +17,13 @@ pub struct Settings {
     pub height: u32,
     /// Адреса PCI відеокарти для гри (Linux). Порожньо — як вирішить система.
     pub gpu: String,
+    /// Назви необовʼязкових модів, які гравець вимкнув (назва не міняється між версіями мода).
+    pub disabled_mods: Vec<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { ram_mb: 0, java_path: String::new(), jvm_args: String::new(), after_launch: "minimize".into(), auto_connect: true, width: 0, height: 0, gpu: String::new() }
+        Self { ram_mb: 0, java_path: String::new(), jvm_args: String::new(), after_launch: "minimize".into(), auto_connect: true, width: 0, height: 0, gpu: String::new(), disabled_mods: Vec::new() }
     }
 }
 

@@ -51,6 +51,8 @@ pub struct FileEntry {
     pub fallback: Option<String>,
     /// Обовʼязковий ресурспак: вмикаємо при кожному запуску, навіть якщо гравець вимкнув.
     pub required: bool,
+    /// Необовʼязковий мод (для краси й зручності): гравець може вимкнути його на сторінці «Збірка».
+    pub optional: bool,
 }
 
 const DIRS: [&str; 4] = ["mods", "resourcepacks", "shaderpacks", "config"];
@@ -71,7 +73,7 @@ mod fingerprint_tests {
     /// sha1("mods/a.jar:aa") — те саме значення має порахувати сервер (Java).
     const FP_A: &str = "546ae3f6237f7d2814bcd9f8e8968ac6b5972e4d";
     fn f(dir: &str, name: &str, sha: &str) -> FileEntry {
-        FileEntry { name: name.into(), dir: dir.into(), filename: name.into(), sha1: sha.into(), size: 1, url: String::new(), fallback: None, required: false }
+        FileEntry { name: name.into(), dir: dir.into(), filename: name.into(), sha1: sha.into(), size: 1, url: String::new(), fallback: None, required: false, optional: false }
     }
     #[test]
     fn order_does_not_matter_but_content_does() {

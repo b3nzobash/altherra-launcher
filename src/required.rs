@@ -49,6 +49,7 @@ pub async fn with_required(m: &Manifest) -> Result<Manifest> {
         url: "https://github.com/b3nzobash/altherra-launcher".into(),
         fallback: None,
         required: false,
+        optional: false,
     });
     Ok(m)
 }
@@ -80,5 +81,6 @@ async fn fabric_api(mc: &str) -> Result<FileEntry> {
         url: file_url.into(),
         fallback: None,
         required: false,
+        optional: false,
     })
 }

@@ -37,6 +37,8 @@ export struct FileItem {
     name: string,
     dir: string,
     size: string,
+    optional: bool,
+    enabled: bool,
 }
 
 // Кнопка бічного меню з іконкою.
@@ -220,6 +222,7 @@ export component AppWindow inherits Window {
     in property <[ChangeItem]> changes: [];
     in property <bool> changes-loading: true;
     in property <[FileItem]> files: [];
+    in property <bool> has-optional: false;
 
     // Акаунти
     in property <[AccountItem]> accounts: [];
@@ -274,6 +277,7 @@ export component AppWindow inherits Window {
     callback refresh();
     callback kill-game();
     callback do-update();
+    callback toggle-mod(string, bool);
 
     Image {
         width: parent.width;
@@ -508,6 +512,12 @@ export component AppWindow inherits Window {
                         Rectangle { horizontal-stretch: 1; }
                         Button { text: "Оновити"; width: 120px; clicked => { root.refresh(); } }
                     }
+                    if root.has-optional: Text {
+                        text: "Моди з перемикачем — лише для краси й зручності, їх можна вимкнути, якщо гра гальмує. Зміни застосуються при наступному запуску гри.";
+                        color: Theme.muted;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
                     Card {
                         vertical-stretch: 1;
                         if root.files.length == 0: Text {
@@ -550,6 +560,15 @@ export component AppWindow inherits Window {
                                     }
                                     Text { text: f.dir; color: Theme.muted; font-family: Theme.mono; font-size: 11px; vertical-alignment: center; }
                                     Text { text: f.size; color: Theme.muted; font-family: Theme.mono; font-size: 11px; vertical-alignment: center; width: 70px; horizontal-alignment: right; }
+                                    // Необовʼязковий мод — перемикач; інші — порожнє місце тієї ж ширини, щоб колонки не стрибали.
+                                    Rectangle {
+                                        width: 42px;
+                                        if f.optional: Toggle {
+                                            y: 14px;
+                                            checked: f.enabled;
+                                            toggled(on) => { root.toggle-mod(f.name, on); }
+                                        }
+                                    }
                                 }
                                 Rectangle {
                                     y: parent.height - 1px;
