@@ -56,7 +56,13 @@ final class LoginKeys {
 	private static String id(Minecraft client) {
 		ServerData server = client.getCurrentServer();
 		if (server == null || client.isLocalServer()) return null;
-		return server.ip.trim().toLowerCase(Locale.ROOT) + "|" + client.getUser().getName().toLowerCase(Locale.ROOT);
+		return normalize(server.ip) + "|" + client.getUser().getName().toLowerCase(Locale.ROOT);
+	}
+
+	/** «altherra.com.ua» і «altherra.com.ua:25565» — той самий сервер (лаунчер пише без стандартного порту). */
+	static String normalize(String address) {
+		String a = address.trim().toLowerCase(Locale.ROOT);
+		return a.endsWith(":25565") ? a.substring(0, a.length() - 6) : a;
 	}
 
 	private static Path file() {
