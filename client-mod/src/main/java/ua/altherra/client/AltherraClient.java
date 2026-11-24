@@ -76,6 +76,7 @@ public final class AltherraClient implements ClientModInitializer {
 
 		// Успішно зайшли — запамʼятовуємо сервер і скидаємо лічильник спроб.
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+			connecting = false;
 			ServerData current = client.getCurrentServer();
 			if (current != null && !client.isLocalServer()) {
 				lastServer = current;
@@ -96,6 +97,7 @@ public final class AltherraClient implements ClientModInitializer {
 
 	/** Екран «Втрачено зʼєднання»: відлік і автоматичне перепідключення. */
 	private static void onDisconnected(Minecraft client, Screen screen, int width, int height) {
+		connecting = false;
 		// Сервер просить підтвердити вхід кодом у Discord — це не про моди: звичайне перепідключення,
 		// щоб гра зайшла сама, щойно гравець надішле код боту.
 		if (modCheckPending && reasonText(screen).contains("Discord")) {
@@ -120,7 +122,10 @@ public final class AltherraClient implements ClientModInitializer {
 		widgets.add(status);
 
 		// Дві кнопки поруч: підключитися одразу, не чекаючи відліку, і скасувати автопідключення.
-		Button now = Button.builder(Component.literal("Підключитися зараз"), b -> connect(client))
+		Button now = Button.builder(Component.literal("Підключитися зараз"), b -> {
+					b.active = false; // повторні кліки нічого не роблять
+					connect(client);
+				})
 				.bounds(width / 2 - 102, y + 16, 100, 20).build();
 		Button cancel = Button.builder(Component.literal("Скасувати"), b -> {
 			cancelled = true;
@@ -157,10 +162,12 @@ public final class AltherraClient implements ClientModInitializer {
 	private static void connect(Minecraft client) {
 		ServerData target = lastServer;
 		if (target == null || connecting) return;
-		connecting = true; // щоб відлік і кнопка не запустили підключення двічі
+		// Одне підключення за раз: друге (подвійний клік чи клік разом із відліком) обірвало б перше,
+		// а обірване підключення повертає в головне меню. Знімаємо позначку лише на наступному
+		// екрані відʼєднання або після входу у світ.
+		connecting = true;
 		attempt++;
 		client.execute(() -> {
-			connecting = false;
 			cancelled = false;
 			ConnectScreen.startConnecting(new TitleScreen(), client, ServerAddress.parseString(target.ip), target, false, null);
 		});
