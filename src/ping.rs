@@ -7,6 +7,8 @@ use tokio::net::TcpStream;
 pub struct Status {
     pub online: u32,
     pub max: u32,
+    /// Номер протоколу сервера — потрібен, щоб лаунчер міг «постукати» на вхід (discordauth).
+    pub protocol: i32,
 }
 
 fn varint(mut v: i32, out: &mut Vec<u8>) {
@@ -69,7 +71,11 @@ pub async fn status(address: &str) -> Result<Status> {
         let mut buf = vec![0; n];
         s.read_exact(&mut buf).await?;
         let v: serde_json::Value = serde_json::from_slice(&buf)?;
-        Ok(Status { online: v["players"]["online"].as_u64().unwrap_or(0) as u32, max: v["players"]["max"].as_u64().unwrap_or(0) as u32 })
+        Ok(Status {
+            online: v["players"]["online"].as_u64().unwrap_or(0) as u32,
+            max: v["players"]["max"].as_u64().unwrap_or(0) as u32,
+            protocol: v["version"]["protocol"].as_i64().unwrap_or(-1) as i32,
+        })
     })
     .await?
 }

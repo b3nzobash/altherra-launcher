@@ -100,6 +100,11 @@ fn main() {
     ui.set_page(0);
     ui.global::<Theme>().set_offline(false);
     ui.set_edition_official(true);
+    ui.set_auth_link(true);
+    ui.set_auth_bot("Altherra".into());
+    ui.set_auth_code("482913".into());
+    shot(&win, w, h, &format!("{out}/ui-discord-code.png"));
+    ui.set_auth_code("".into());
     for (i, name) in [(1, "build"), (2, "settings"), (3, "log")] {
         ui.set_page(i);
         shot(&win, w, h, &format!("{out}/ui-{name}.png"));

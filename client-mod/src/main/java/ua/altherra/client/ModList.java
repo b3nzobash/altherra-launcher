@@ -42,6 +42,9 @@ final class ModList {
 		}
 		// Відбиток збірки від лаунчера (моди, текстури, шейдери, конфіги). Старий сервер цього поля не читає.
 		out.writeUtf(System.getProperty("altherra.build", ""), 64);
+		// Ключ входу від сервера (після підтвердження через Discord — без кодів). Старий сервер цього поля не читає.
+		out.writeUtf(LoginKeys.current(), 128);
+		out.writeBoolean(false); // не «проба»: це справжній вхід у гру
 	}
 
 	private static synchronized List<Entry> list() {
