@@ -1,6 +1,6 @@
 [package]
 name = "altherra-launcher"
-version = "1.4.13"
+version = "1.4.14"
 edition = "2024"
 
 [features]
@@ -11,6 +11,7 @@ microsoft = []
 [dependencies]
 anyhow = "1.0.104"
 ed25519-dalek = "3.0.0"
+flate2 = "1.1.11"
 futures-util = "0.3.34"
 hex = "0.4.3"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }

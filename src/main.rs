@@ -2,6 +2,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod auth;
+mod discordauth;
 mod gpu;
 mod launch;
 mod manifest;
@@ -50,6 +51,8 @@ struct State {
     game_running: bool,
     kill: Option<tokio::sync::oneshot::Sender<()>>,
     ms_cancel: Option<tokio::sync::watch::Sender<bool>>,
+    /// Гравець натиснув «Скасувати» у вікні з кодом Discord.
+    auth_cancel: bool,
 }
 
 type Shared = Arc<Mutex<State>>;
@@ -417,6 +420,50 @@ fn set_busy(weak: &Weak<AppWindow>, state: &Shared, busy: bool, text: &str) {
 }
 
 /// Готує файли (і, якщо `launch`, запускає гру).
+/// Питає сервер, чи пустить гравця. Якщо треба — показує код для бота в Discord і чекає підтвердження
+/// (до 10 хвилин). Сервер недоступний чи не знає про вхід через Discord — просто запускаємо гру.
+async fn discord_login(weak: &Weak<AppWindow>, state: &Shared, address: &str, nick: &str) -> anyhow::Result<()> {
+    state.lock().unwrap().auth_cancel = false;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
+    let hide = |weak: &Weak<AppWindow>| {
+        let _ = weak.upgrade_in_event_loop(|ui| ui.set_auth_code("".into()));
+    };
+    loop {
+        let key = discordauth::load_key(address, nick);
+        match discordauth::probe(address, nick, &key).await {
+            Ok(discordauth::Probe::Ok(new_key)) => {
+                if let Some(k) = new_key {
+                    discordauth::save_key(address, nick, &k);
+                }
+                hide(weak);
+                return Ok(());
+            }
+            Ok(discordauth::Probe::Code { code, link, bot }) => {
+                let _ = weak.upgrade_in_event_loop(move |ui| {
+                    ui.set_auth_link(link);
+                    ui.set_auth_bot(bot.into());
+                    ui.set_auth_code(code.into());
+                });
+            }
+            Ok(discordauth::Probe::Skip) | Err(_) => {
+                hide(weak);
+                return Ok(());
+            }
+        }
+        for _ in 0..6 {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            if state.lock().unwrap().auth_cancel {
+                hide(weak);
+                anyhow::bail!("Вхід скасовано");
+            }
+        }
+        if std::time::Instant::now() > deadline {
+            hide(weak);
+            anyhow::bail!("Код не підтвердили за 10 хвилин — спробуй ще раз");
+        }
+    }
+}
+
 fn run(weak: Weak<AppWindow>, state: Shared, launch_game: bool, check_hash: bool) {
     {
         let mut st = state.lock().unwrap();
@@ -458,6 +505,10 @@ fn run(weak: Weak<AppWindow>, state: Shared, launch_game: bool, check_hash: bool
                 }
                 (false, a) => a,
             };
+            // Вхід через Discord (для ніків без ліцензії): спершу питаємо сервер, чи пустить, і за потреби показуємо код.
+            if let Some(a) = account.as_ref().filter(|a| launch_game && a.kind == Kind::Offline && !m.server_address.is_empty()) {
+                discord_login(&weak, &state, &m.server_address, &a.name).await?;
+            }
             let reporter = Arc::new(UiReporter(weak.clone(), Mutex::new(std::time::Instant::now())));
             let prepared = launch::prepare(&m, &settings, check_hash, reporter).await?;
             if !launch_game {
@@ -575,6 +626,28 @@ fn cli(args: &[String]) -> anyhow::Result<()> {
                     let exe = update::install(&a, |p| eprint!("\r{:>3.0}%", p * 100.0)).await?;
                     eprintln!("\nОновлено: {}", exe.display());
                 }
+            }
+            Ok(())
+        });
+    }
+    // Діагностика входу через Discord: --probe нік [адреса]
+    if let Some(i) = args.iter().position(|a| a == "--probe") {
+        let nick = args.get(i + 1).cloned().unwrap_or_default();
+        return rt().block_on(async {
+            let addr = match args.get(i + 2) {
+                Some(a) => a.clone(),
+                None => manifest::fetch().await?.0.server_address,
+            };
+            let key = discordauth::load_key(&addr, &nick);
+            match discordauth::probe(&addr, &nick, &key).await? {
+                discordauth::Probe::Ok(k) => {
+                    eprintln!("ok, новий ключ: {}", k.is_some());
+                    if let Some(k) = k {
+                        discordauth::save_key(&addr, &nick, &k);
+                    }
+                }
+                discordauth::Probe::Code { code, link, bot } => eprintln!("код {code} (прив'язка: {link}, бот: {bot})"),
+                discordauth::Probe::Skip => eprintln!("сервер не просить входу через Discord"),
             }
             Ok(())
         });
@@ -799,6 +872,12 @@ fn main() -> Result<(), slint::PlatformError> {
                 let _ = k.send(());
             }
         });
+    }
+
+    // Вікно з кодом Discord: «Скасувати».
+    {
+        let state = state.clone();
+        ui.on_auth_cancel(move || state.lock().unwrap().auth_cancel = true);
     }
 
     // Необовʼязкові моди: гравець вмикає/вимикає на сторінці «Збірка».

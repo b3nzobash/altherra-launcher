@@ -231,6 +231,10 @@ export component AppWindow inherits Window {
     in-out property <bool> accounts-open: false;
     in property <bool> ms-available: false;
     in property <string> ms-code: "";
+    // Вхід через Discord: код для бота (порожньо — вікно сховане), чи це перша прив'язка, імʼя бота.
+    in property <string> auth-code: "";
+    in property <bool> auth-link: false;
+    in property <string> auth-bot: "";
     in property <string> ms-url: "";
     in property <bool> ms-waiting: false;
     in property <string> acc-error: "";
@@ -278,6 +282,7 @@ export component AppWindow inherits Window {
     callback kill-game();
     callback do-update();
     callback toggle-mod(string, bool);
+    callback auth-cancel();
 
     Image {
         width: parent.width;
@@ -998,6 +1003,65 @@ export component AppWindow inherits Window {
                             clicked => { root.play(); }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // ---------- Вхід через Discord ----------
+    if root.auth-code != "": Rectangle {
+        background: Theme.bg.with-alpha(0.82);
+        TouchArea { }
+        Rectangle {
+            width: 480px;
+            height: auth-box.preferred-height;
+            background: Theme.bg2;
+            border-width: 2px;
+            border-color: Theme.line-strong;
+            auth-box := VerticalLayout {
+                padding: 26px;
+                spacing: 14px;
+                Text {
+                    text: root.auth-link ? "Прив'яжи Discord" : "Підтвердь вхід";
+                    font-family: Theme.display;
+                    font-weight: 800;
+                    font-size: 22px;
+                    color: Theme.text;
+                }
+                Text {
+                    text: root.auth-link
+                        ? "Твій нік ще не прив'язаний до Discord. Надішли цей код в особисті повідомлення боту " + (root.auth-bot == "" ? "Altherra" : root.auth-bot) + " на Discord-сервері Altherra — Discord стане твоїм акаунтом, пароль не потрібен."
+                        : "Надішли цей код в особисті повідомлення боту " + (root.auth-bot == "" ? "Altherra" : root.auth-bot) + " на Discord-сервері Altherra.";
+                    color: Theme.muted;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+                Rectangle {
+                    height: 72px;
+                    background: Theme.cyan.with-alpha(0.05);
+                    border-width: 2px;
+                    border-color: Theme.cyan.with-alpha(0.25);
+                    TextInput {
+                        text: root.auth-code;
+                        read-only: true;
+                        font-family: Theme.mono;
+                        font-size: 36px;
+                        letter-spacing: 8px;
+                        color: Theme.cyan;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        selection-background-color: Theme.cyan.with-alpha(0.33);
+                    }
+                }
+                Text {
+                    text: "Лаунчер чекає й сам запустить гру, щойно бот підтвердить код. Код діє 10 хвилин.";
+                    color: Theme.muted;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    Button { text: "Скасувати"; clicked => { root.auth-cancel(); } }
                 }
             }
         }
