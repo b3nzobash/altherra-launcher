@@ -46,10 +46,31 @@ final class LoginKeys {
 		});
 	}
 
-	/** Ключ для сервера, до якого зараз підключаємося, або "". */
-	static String current() {
-		String id = id(Minecraft.getInstance());
-		return id == null ? "" : load().getOrDefault(id, "");
+	/**
+	 * Ключ для сервера, до якого зараз підключаємося, або "".
+	 * На етапі входу Minecraft.getCurrentServer() ще порожній — адресу беремо з обробника входу (поле serverData).
+	 */
+	static String current(Object loginHandler) {
+		ServerData server = serverOf(loginHandler);
+		Minecraft client = Minecraft.getInstance();
+		if (server == null) server = client.getCurrentServer();
+		if (server == null) return "";
+		return load().getOrDefault(normalize(server.ip) + "|" + client.getUser().getName().toLowerCase(Locale.ROOT), "");
+	}
+
+	private static ServerData serverOf(Object handler) {
+		if (handler == null) return null;
+		for (Class<?> c = handler.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+			for (var f : c.getDeclaredFields()) {
+				if (f.getType() != ServerData.class) continue;
+				try {
+					f.setAccessible(true);
+					return (ServerData) f.get(handler);
+				} catch (Exception ignored) {
+				}
+			}
+		}
+		return null;
 	}
 
 	/** «адреса|нік» — ключ від одного сервера не надсилаємо іншому. */

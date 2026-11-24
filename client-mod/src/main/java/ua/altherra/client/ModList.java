@@ -30,7 +30,7 @@ final class ModList {
 
 	private static List<Entry> cached;
 
-	static void write(FriendlyByteBuf out) {
+	static void write(FriendlyByteBuf out, Object loginHandler) {
 		List<Entry> mods = list();
 		out.writeVarInt(PROTOCOL);
 		out.writeVarInt(mods.size());
@@ -43,7 +43,7 @@ final class ModList {
 		// Відбиток збірки від лаунчера (моди, текстури, шейдери, конфіги). Старий сервер цього поля не читає.
 		out.writeUtf(System.getProperty("altherra.build", ""), 64);
 		// Ключ входу від сервера (після підтвердження через Discord — без кодів). Старий сервер цього поля не читає.
-		out.writeUtf(LoginKeys.current(), 128);
+		out.writeUtf(LoginKeys.current(loginHandler), 128);
 		out.writeBoolean(false); // не «проба»: це справжній вхід у гру
 	}
 

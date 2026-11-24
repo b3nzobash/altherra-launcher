@@ -60,7 +60,7 @@ public final class AltherraClient implements ClientModInitializer {
 		ClientLoginNetworking.registerGlobalReceiver(ModList.CHANNEL, (client, handler, buf, listenerAdder) -> {
 			modCheckPending = true;
 			FriendlyByteBuf out = new FriendlyByteBuf(Unpooled.buffer());
-			ModList.write(out);
+			ModList.write(out, handler);
 			return CompletableFuture.completedFuture(out);
 		});
 
