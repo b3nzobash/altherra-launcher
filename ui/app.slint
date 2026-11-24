@@ -200,6 +200,8 @@ export component AppWindow inherits Window {
     // Сервер і збірка
     in property <string> server-name: "Altherra";
     in property <string> tagline: "Слава Україні!";
+    // «3 год 25 хв» — скільки награно через лаунчер; порожньо, поки ще не грав.
+    in property <string> playtime: "";
     in property <int> server-state: 0; // 0 перевіряємо, 1 онлайн, 2 вимкнений
     in property <string> server-status: "перевіряємо сервер…";
     in property <bool> stats-visible: false;
@@ -395,6 +397,24 @@ export component AppWindow inherits Window {
                         font-size: 17px;
                         color: Theme.muted;
                         wrap: word-wrap;
+                    }
+                    if root.playtime != "": Rectangle { height: 12px; }
+                    if root.playtime != "": HorizontalLayout {
+                        alignment: start;
+                        spacing: 8px;
+                        Text {
+                            text: "Награно";
+                            font-size: 13px;
+                            color: Theme.muted;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: root.playtime;
+                            font-family: Theme.mono;
+                            font-size: 13px;
+                            color: Theme.cyan;
+                            vertical-alignment: center;
+                        }
                     }
 
                     if root.stats-visible: Rectangle { height: 22px; }
