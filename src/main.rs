@@ -520,9 +520,9 @@ fn run(weak: Weak<AppWindow>, state: Shared, launch_game: bool, check_hash: bool
                     run(ui.as_weak(), state2, true, false);
                     return;
                 }
+                // «Закрити» ховає лаунчер на час гри; коли гру закрили — показуємо його знову.
                 if settings.after_launch == "close" {
-                    slint::quit_event_loop().ok();
-                    return;
+                    let _ = ui.show();
                 }
                 ui.window().set_minimized(false);
                 if crashed {
