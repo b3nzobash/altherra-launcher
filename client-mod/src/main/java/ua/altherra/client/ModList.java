@@ -42,6 +42,8 @@ final class ModList {
 		}
 		// Відбиток збірки від лаунчера (моди, текстури, шейдери, конфіги). Старий сервер цього поля не читає.
 		out.writeUtf(System.getProperty("altherra.build", ""), 64);
+		// Ключ входу замість /login (виданий сервером після минулого входу). Старий сервер цього поля не читає.
+		out.writeUtf(LoginKeys.current(), 128);
 	}
 
 	private static synchronized List<Entry> list() {
