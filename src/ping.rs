@@ -47,11 +47,52 @@ fn packet(id: i32, body: &[u8]) -> Vec<u8> {
     out
 }
 
-pub async fn status(address: &str) -> Result<Status> {
-    let (host, port) = match address.rsplit_once(':') {
+/// «хост[:порт]» → куди насправді підключатися. Як і сама гра, за стандартного порту 25565 дивимося SRV-запис
+/// `_minecraft._tcp.хост`: так сайт і Minecraft живуть на одному домені (сайт — через Cloudflare, гра — на іншій адресі).
+pub async fn resolve(address: &str) -> (String, u16) {
+    let (host, port) = match address.trim().rsplit_once(':') {
         Some((h, p)) if p.parse::<u16>().is_ok() => (h.to_owned(), p.parse().unwrap()),
-        _ => (address.to_owned(), 25565u16),
+        _ => (address.trim().to_owned(), 25565u16),
     };
+    if port == 25565 && host.parse::<std::net::IpAddr>().is_err() {
+        if let Some(target) = srv_lookup(&host).await {
+            return target;
+        }
+    }
+    (host, port)
+}
+
+/// SRV через DNS-over-HTTPS (Cloudflare): без окремого DNS-клієнта, той самий reqwest, що й для решти.
+async fn srv_lookup(host: &str) -> Option<(String, u16)> {
+    let url = format!("https://cloudflare-dns.com/dns-query?name=_minecraft._tcp.{host}&type=SRV");
+    let resp = reqwest::Client::new()
+        .get(url)
+        .header("accept", "application/dns-json")
+        .timeout(Duration::from_secs(4))
+        .send()
+        .await
+        .ok()?;
+    let v: serde_json::Value = resp.json().await.ok()?;
+    parse_srv(&v)
+}
+
+fn parse_srv(v: &serde_json::Value) -> Option<(String, u16)> {
+    // data: «пріоритет вага порт ціль.»; беремо запис із найменшим пріоритетом.
+    v["Answer"]
+        .as_array()?
+        .iter()
+        .filter(|a| a["type"].as_u64() == Some(33))
+        .filter_map(|a| {
+            let parts: Vec<&str> = a["data"].as_str()?.split_whitespace().collect();
+            let (prio, port, target) = (parts.first()?.parse::<u32>().ok()?, parts.get(2)?.parse::<u16>().ok()?, parts.get(3)?.trim_end_matches('.'));
+            (!target.is_empty()).then(|| (prio, target.to_owned(), port))
+        })
+        .min_by_key(|(p, _, _)| *p)
+        .map(|(_, t, p)| (t, p))
+}
+
+pub async fn status(address: &str) -> Result<Status> {
+    let (host, port) = resolve(address).await;
     tokio::time::timeout(Duration::from_secs(5), async {
         let mut s = TcpStream::connect((host.as_str(), port)).await?;
         let mut hs = Vec::new();
@@ -78,4 +119,14 @@ pub async fn status(address: &str) -> Result<Status> {
         })
     })
     .await?
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn srv() {
+        let v: serde_json::Value = serde_json::from_str(r#"{"Status":0,"Answer":[{"name":"_minecraft._tcp.altherra.com.ua","type":33,"TTL":300,"data":"10 5 25570 b.altherra.com.ua."},{"name":"_minecraft._tcp.altherra.com.ua","type":33,"TTL":300,"data":"0 5 25565 play.altherra.com.ua."}]}"#).unwrap();
+        assert_eq!(super::parse_srv(&v), Some(("play.altherra.com.ua".into(), 25565)));
+        assert_eq!(super::parse_srv(&serde_json::json!({"Status":3})), None);
+    }
 }
