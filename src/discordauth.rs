@@ -175,10 +175,8 @@ fn flatten(v: &serde_json::Value) -> String {
 }
 
 pub async fn probe(address: &str, nick: &str, key: &str) -> Result<Probe> {
-    let (host, port) = match address.rsplit_once(':') {
-        Some((h, p)) if p.parse::<u16>().is_ok() => (h.to_owned(), p.parse().unwrap()),
-        _ => (address.to_owned(), 25565u16),
-    };
+    // Справжня адреса гри (з урахуванням SRV-запису — сайт і гра можуть бути на одному домені).
+    let (host, port) = crate::ping::resolve(address).await;
     let protocol = crate::ping::status(address).await?.protocol;
     tokio::time::timeout(Duration::from_secs(10), async {
         let mut c = Conn { s: TcpStream::connect((host.as_str(), port)).await?, threshold: -1 };
