@@ -3,14 +3,22 @@
   "id": "altherra-client",
   "version": "${version}",
   "name": "Altherra Client",
-  "description": "Для сервера Altherra: після кіку гра сама перепідключається, а кнопка «Вийти з гри» в меню паузи закриває Minecraft.",
-  "authors": ["Altherra"],
-  "contact": { "homepage": "https://altherra.com.ua" },
-  "license": "All-Rights-Reserved",
+  "description": "Мод для сервера Altherra: показує серверу список модів (перевірка збірки), зберігає ключ входу після підтвердження в Discord, сам перепідключається після вильоту.",
+  "authors": [
+    "Altherra"
+  ],
+  "contact": {
+    "homepage": "https://altherra.com.ua",
+    "sources": "https://github.com/b3nzobash/altherra-client",
+    "issues": "https://github.com/b3nzobash/altherra-client/issues"
+  },
+  "license": "GPL-3.0-only",
   "icon": "assets/altherra-client/icon.png",
   "environment": "client",
   "entrypoints": {
-    "client": ["ua.altherra.client.AltherraClient"]
+    "client": [
+      "ua.altherra.client.AltherraClient"
+    ]
   },
   "depends": {
     "fabricloader": ">=0.20.0",
