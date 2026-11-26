@@ -42,7 +42,7 @@ jobs:
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
           $extra = @()
           if ($env:OFFLINE -eq 'true') { $extra = @("/DAPP=Altherra Offline", "/DEXE_BASE=AltherraOffline", "/DREG_ID=AltherraOfflineLauncher", "/DICON=icon-offline.ico") }
-          & $nsis /V2 "/DVERSION=$version" @extra "/DEXE=$PWD\dist\$env:FILE-windows-x64.exe" "/DOUT=$PWD\dist\$env:FILE-Setup-windows-x64.exe" installer\windows\altherra.nsi
+          & $nsis /V2 /INPUTCHARSET UTF8 "/DVERSION=$version" @extra "/DEXE=$PWD\dist\$env:FILE-windows-x64.exe" "/DOUT=$PWD\dist\$env:FILE-Setup-windows-x64.exe" installer\windows\altherra.nsi
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - uses: actions/upload-artifact@v4
         with: { name: windows, path: dist/* }

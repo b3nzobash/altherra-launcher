@@ -1,4 +1,4 @@
-; Інсталятор лаунчера Altherra для Windows.
+﻿; Інсталятор лаунчера Altherra для Windows.
 ; makensis /DVERSION=1.2.0 /DEXE=шлях\Altherra-windows-x64.exe /DOUT=Altherra-Setup-windows-x64.exe altherra.nsi
 ; Offline-версія: /DAPP="Altherra Offline" /DEXE_BASE=AltherraOffline /DREG_ID=AltherraOfflineLauncher
 ; Ставиться для поточного користувача в %LOCALAPPDATA%\Programs\Altherra — без прав адміністратора,

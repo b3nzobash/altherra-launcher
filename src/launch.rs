@@ -36,11 +36,17 @@ pub async fn prepare(m: &Manifest, settings: &Settings, check_hash: bool, rep: s
     let java = if settings.java_path.trim().is_empty() {
         let component = mojang::java_component(&profile);
         let exe = mojang::java_exe(&component);
-        if !exe.exists() || check_hash {
+        // Позначка про перевірену Java: без неї (старі встановлення могли зіпсуватися) звіряємо всі хеші.
+        let verified = Some(mojang::java_home(&component).join(".altherra-verified-2"));
+        let trusted = verified.as_ref().is_some_and(|v| v.exists());
+        if !exe.exists() || check_hash || !trusted {
             rep.stage("Готуємо Java…", 0.05);
             let files = mojang::java_files(&component).await?;
             let r = rep.clone();
-            net::download_all(files, 16, check_hash, move |d, t, b| r.stage(&format!("Java · {d} / {t} · {}", fmt_mb(b)), 0.05 + 0.15 * d as f32 / t as f32)).await?;
+            net::download_all(files, 16, true, move |d, t, b| r.stage(&format!("Java · {d} / {t} · {}", fmt_mb(b)), 0.05 + 0.15 * d as f32 / t as f32)).await?;
+            if let Some(v) = verified {
+                let _ = std::fs::write(v, b"ok");
+            }
         }
         exe
     } else {
