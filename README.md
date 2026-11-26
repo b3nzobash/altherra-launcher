@@ -89,3 +89,23 @@ cargo build --release --no-default-features  # Altherra Offline
 ---
 
 Не є офіційним продуктом Minecraft. Не схвалено Mojang чи Microsoft і не повʼязано з ними. Шрифти Unbounded, Manrope і JetBrains Mono — за ліцензією SIL OFL 1.1 (`ui/fonts`). Made with Slint.
+
+## Ліцензія
+
+[GNU GPL v3](LICENSE) або новіша. Код відкритий: можна читати, перевіряти, збирати самому й змінювати за умовами ліцензії.
+
+## Code signing policy
+
+Windows releases of **Altherra** (`launcher-v…` tags) are built from this repository by GitHub Actions and are intended to be signed.
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+- **Committers and reviewers:** [b3nzobash](https://github.com/b3nzobash)
+- **Approvers:** [b3nzobash](https://github.com/b3nzobash)
+
+Only binaries built by the CI workflow from tagged commits of this repository are submitted for signing. Nothing built locally is signed.
+
+**Privacy policy.** This program does not transfer any information to other networked systems unless it is needed for what the user asked it to do:
+signing in with a Microsoft account (Microsoft, Xbox Live, Mojang), downloading the game, Java and mods (Mojang, Fabric, Modrinth, the Altherra server),
+checking for launcher updates (GitHub) and checking the server status. The launcher has no analytics or telemetry.
+The privacy policy of the Altherra project: https://altherra.com.ua/privacy
+
