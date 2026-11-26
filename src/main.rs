@@ -190,24 +190,29 @@ fn push_settings(ui: &AppWindow, s: &Settings, recommended_mb: u32) {
     ui.set_java_path(s.java_path.clone().into());
     ui.set_jvm_args(s.jvm_args.clone().into());
     ui.set_auto_connect(s.auto_connect);
-    let list = gpu::list();
-    let gpus: Vec<GpuItem> = std::iter::once(GpuItem { slot: "".into(), name: "Як у системі".into() })
-        .chain(list.iter().map(|g| GpuItem { slot: g.slot.clone().into(), name: g.name.clone().into() }))
-        .collect();
-    ui.set_gpus(ModelRc::new(VecModel::from(gpus)));
-    // Обрана відеокарта зараз не підключена — показуємо її адресу, щоб було видно, що вибір збережено.
-    let name = if s.gpu.is_empty() {
-        "Як у системі".to_owned()
-    } else {
-        list.iter().find(|g| g.slot == s.gpu).map(|g| g.name.clone()).unwrap_or_else(|| "Не підключена".to_owned())
-    };
-    ui.set_gpu_slot(s.gpu.clone().into());
-    ui.set_gpu_name(name.into());
+    push_gpus(ui, &s.gpu);
     ui.set_after_launch(match s.after_launch.as_str() {
         "keep" => 0,
         "close" => 2,
         _ => 1,
     });
+}
+
+/// Список відеокарт у налаштуваннях і назва обраної.
+fn push_gpus(ui: &AppWindow, selected: &str) {
+    let list = gpu::list();
+    let gpus: Vec<GpuItem> = std::iter::once(GpuItem { slot: "".into(), name: "Як у системі".into() })
+        .chain(list.iter().map(|g| GpuItem { slot: g.slot.clone().into(), name: g.name.clone().into() }))
+        .collect();
+    ui.set_gpus(ModelRc::new(VecModel::from(gpus)));
+    // Обрана відеокарта зараз не підключена — показуємо, що вибір збережено, але її немає.
+    let name = if selected.is_empty() {
+        "Як у системі".to_owned()
+    } else {
+        list.iter().find(|g| g.slot == selected).map(|g| g.name.clone()).unwrap_or_else(|| "Не підключена".to_owned())
+    };
+    ui.set_gpu_slot(selected.into());
+    ui.set_gpu_name(name.into());
 }
 
 // ---------- Фонові задачі ----------
@@ -723,11 +728,12 @@ fn main() -> Result<(), slint::PlatformError> {
     load_manifest(ui.as_weak(), state.clone());
     ping_loop(ui.as_weak(), state.clone());
 
-    // Оновлення лаунчера: перевіряємо при старті, ставимо за кнопкою.
+    // Оновлення лаунчера: перевіряємо при старті й далі кожні 10 хвилин — кнопка «Оновити» зʼявляється
+    // одразу, як вийде нова версія, без перезапуску лаунчера.
     let pending_update: Arc<Mutex<Option<update::Available>>> = Arc::default();
     {
         let (weak, pending) = (ui.as_weak(), pending_update.clone());
-        rt().spawn(async move {
+        rt().spawn(async move { loop {
             // Один запит до GitHub: і кнопка «Оновити», і сторінка «Що нового».
             let res = update::check_with_changes().await;
             let (avail, changes) = match res {
@@ -745,13 +751,35 @@ fn main() -> Result<(), slint::PlatformError> {
                 if let Some(v) = v {
                     ui.set_update_version(v.into());
                 }
-                let model: Vec<ChangeItem> = items
-                    .into_iter()
-                    .map(|(version, date, notes, current)| ChangeItem { version: version.into(), date: date.into(), notes: notes.into(), current })
-                    .collect();
-                ui.set_changes(ModelRc::new(VecModel::from(model)));
+                // Без інтернету список порожній — тоді лишаємо той, що вже показано.
+                if !items.is_empty() {
+                    let model: Vec<ChangeItem> = items
+                        .into_iter()
+                        .map(|(version, date, notes, current)| ChangeItem { version: version.into(), date: date.into(), notes: notes.into(), current })
+                        .collect();
+                    ui.set_changes(ModelRc::new(VecModel::from(model)));
+                }
                 ui.set_changes_loading(false);
             });
+            tokio::time::sleep(Duration::from_secs(600)).await;
+        } });
+    }
+
+    // Відеокарти: eGPU через Thunderbolt можна підʼєднати будь-коли — список оновлюється сам.
+    let gpu_timer = slint::Timer::default();
+    {
+        let (weak, state) = (ui.as_weak(), state.clone());
+        let mut last = gpu::signature();
+        gpu_timer.start(slint::TimerMode::Repeated, Duration::from_secs(3), move || {
+            let sig = gpu::signature();
+            if sig == last {
+                return;
+            }
+            last = sig;
+            if let Some(ui) = weak.upgrade() {
+                let selected = state.lock().unwrap().settings.gpu.clone();
+                push_gpus(&ui, &selected);
+            }
         });
     }
     {
