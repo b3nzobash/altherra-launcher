@@ -103,6 +103,12 @@ public final class AltherraClient implements ClientModInitializer {
 		if (modCheckPending && reasonText(screen).contains("Discord")) {
 			modCheckPending = false;
 		}
+		// Підказку про нові моди показуємо, лише коли сервер справді відмовив через збірку (у таких повідомленнях
+		// завжди є «збірк…»). Обрив чи тайм-аут після перевірки модів — наприклад, поки сервер ще завантажується
+		// після рестарту, — це звичайне перепідключення.
+		if (modCheckPending && !reasonText(screen).toLowerCase(java.util.Locale.ROOT).contains("збірк")) {
+			modCheckPending = false;
+		}
 		if (modCheckPending) {
 			// Сервер не пустив через моди: лаунчер має оновити збірку, тож замість перепідключення — підказка.
 			modCheckPending = false;
