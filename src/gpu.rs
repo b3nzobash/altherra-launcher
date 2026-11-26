@@ -24,6 +24,23 @@ pub fn list() -> Vec<Gpu> {
     }
 }
 
+/// Дешевий «відбиток» підключених відеокарт (лише імена в /sys/class/drm): лаунчер перевіряє його кожні
+/// кілька секунд і перечитує повний список, тільки коли щось підключили чи відʼєднали (eGPU через Thunderbolt).
+pub fn signature() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        let mut names: Vec<String> = std::fs::read_dir("/sys/class/drm")
+            .map(|rd| rd.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with("card") && !n.contains('-')).collect())
+            .unwrap_or_default();
+        names.sort();
+        names.join(",")
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        String::new()
+    }
+}
+
 /// Змінні середовища для гри, щоб вона малювалася на відеокарті `slot`. None — такої зараз немає (eGPU відʼєднано).
 pub fn env_for(slot: &str) -> Option<Vec<(&'static str, String)>> {
     let g = list().into_iter().find(|g| g.slot == slot)?;
