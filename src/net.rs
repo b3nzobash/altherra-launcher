@@ -137,7 +137,12 @@ pub fn is_valid(d: &Download, check_hash: bool) -> bool {
 }
 
 async fn fetch_once(url: &str, d: &Download, done_bytes: &AtomicU64) -> Result<()> {
-    let tmp = d.path.with_extension("part");
+    // Тимчасове ім'я — від повного імені файлу й унікальне: раніше jvm.cfg і jvm.lib качалися
+    // в один і той самий jvm.part і перезаписували одне одного (Java падала з «No leading -»).
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let mut name = d.path.file_name().unwrap_or_default().to_os_string();
+    name.push(format!(".{}.part", SEQ.fetch_add(1, Ordering::Relaxed)));
+    let tmp = d.path.with_file_name(name);
     let res = client().get(url).send().await?;
     if !res.status().is_success() {
         bail!("{} відповів {}", host(url), res.status());
