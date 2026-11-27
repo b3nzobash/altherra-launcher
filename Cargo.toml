@@ -1,6 +1,6 @@
 [package]
 name = "altherra-launcher"
-version = "1.4.21"
+version = "1.4.22"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/b3nzobash/altherra-launcher"
 edition = "2024"
