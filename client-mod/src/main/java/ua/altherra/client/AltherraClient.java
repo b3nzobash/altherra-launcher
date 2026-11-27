@@ -57,6 +57,7 @@ public final class AltherraClient implements ClientModInitializer {
 		}
 
 		LoginKeys.register();
+		DroneClient.register();
 		ClientLoginNetworking.registerGlobalReceiver(ModList.CHANNEL, (client, handler, buf, listenerAdder) -> {
 			modCheckPending = true;
 			FriendlyByteBuf out = new FriendlyByteBuf(Unpooled.buffer());
